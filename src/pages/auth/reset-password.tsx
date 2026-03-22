@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Mail, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
-import { resetPasswordRequestSchema, newPasswordSchema, getFirstZodError } from "@/lib/schemas";
+import { resetPasswordRequestSchema, newPasswordSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 
 export default function ResetPassword() {
   const router = useRouter();
@@ -51,6 +51,7 @@ export default function ResetPassword() {
     e.preventDefault();
     const parsed = resetPasswordRequestSchema.safeParse({ email });
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "❌ Data Tidak Valid",
         description: getFirstZodError(parsed.error),
@@ -95,6 +96,7 @@ export default function ResetPassword() {
     const parsed = newPasswordSchema.safeParse({ newPassword, confirmPassword });
 
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "❌ Data Tidak Valid",
         description: getFirstZodError(parsed.error),

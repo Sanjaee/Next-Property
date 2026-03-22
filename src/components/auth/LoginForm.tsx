@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
-import { loginSchema, getFirstZodError } from "@/lib/schemas";
+import { loginSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 
 interface LoginFormData {
   email: string;
@@ -47,6 +47,7 @@ export const LoginForm = () => {
 
     const parsed = loginSchema.safeParse(formData);
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "Error",
         description: getFirstZodError(parsed.error),

@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Mail, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
-import { verifyOtpSchema, getFirstZodError } from "@/lib/schemas";
+import { verifyOtpSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 
 export default function VerifyOtp() {
   const router = useRouter();
@@ -299,6 +299,7 @@ export default function VerifyOtp() {
     const otpString = otp.join("");
     const parsed = verifyOtpSchema.safeParse({ otp: otpString });
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "❌ Data Tidak Valid",
         description: getFirstZodError(parsed.error),
@@ -384,7 +385,7 @@ export default function VerifyOtp() {
           <CardContent>
             <form onSubmit={handleSubmit}>
               <div className="flex flex-col gap-6">
-                <div className="grid gap-3">
+                <div className="grid gap-3" id="otp">
                   <div
                     className="flex gap-2 items-center justify-center"
                     onPaste={handlePaste}

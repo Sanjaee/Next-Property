@@ -36,7 +36,7 @@ import {
   DialogContent,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { contactFormSchema, getFirstZodError } from "@/lib/schemas";
+import { contactFormSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 
 const PropertyLocationMap = dynamic(
   () =>
@@ -118,6 +118,7 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
       message: contactMessage,
     });
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "❌ Data Tidak Valid",
         description: getFirstZodError(parsed.error),
@@ -550,9 +551,10 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
                   <h3 className="font-semibold text-lg">Hubungi Pemilik</h3>
                   <form onSubmit={handleContactSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="contact-name">Nama Lengkap</Label>
+                      <Label htmlFor="name">Nama Lengkap</Label>
                       <Input
-                        id="contact-name"
+                        id="name"
+                        data-field="name"
                         placeholder="Masukkan nama lengkap"
                         className="bg-background"
                         value={contactName}
@@ -560,9 +562,10 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="contact-email">Email</Label>
+                      <Label htmlFor="email">Email</Label>
                       <Input
-                        id="contact-email"
+                        id="email"
+                        data-field="email"
                         type="email"
                         placeholder="email@contoh.com"
                         className="bg-background"
@@ -573,7 +576,8 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
                     <div className="space-y-2">
                       <Label htmlFor="contact-phone">Nomor Telepon</Label>
                       <Input
-                        id="contact-phone"
+                        id="phone"
+                        data-field="phone"
                         placeholder="08xxxxxxxxxx"
                         className="bg-background"
                         value={contactPhone}
@@ -581,9 +585,10 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="contact-message">Pesan</Label>
+                      <Label htmlFor="message">Pesan</Label>
                       <Textarea
-                        id="contact-message"
+                        id="message"
+                        data-field="message"
                         placeholder="Tulis pesan Anda..."
                         rows={4}
                         className="bg-background resize-none"

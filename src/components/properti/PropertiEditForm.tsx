@@ -16,8 +16,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, MapPin, Upload, X } from "lucide-react";
-import { propertiFormSchema, getFirstZodError } from "@/lib/schemas";
+import { Loader2, Upload, X } from "lucide-react";
+import { propertiFormSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
+import { AddressSelector } from "@/components/address/AddressSelector";
 
 const TIPE_PROPERTI = [
   { value: "house", label: "Rumah" },
@@ -68,7 +69,6 @@ export function PropertiEditForm({ editId }: { editId: string }) {
   const [form, setForm] = useState(initialForm);
   const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
   const [newImageFiles, setNewImageFiles] = useState<string[]>([]);
-  const [locationLoading, setLocationLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -171,25 +171,25 @@ export function PropertiEditForm({ editId }: { editId: string }) {
     setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) return;
-    setLocationLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        update("latitude", String(pos.coords.latitude));
-        update("longitude", String(pos.coords.longitude));
-        setLocationLoading(false);
-        toast({ title: "Lokasi berhasil", description: "Koordinat telah diisi." });
-      },
-      () => {
-        setLocationLoading(false);
-        toast({
-          title: "Gagal mendapatkan lokasi",
-          variant: "destructive",
-        });
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  const handleAddressChange = (data: {
+    address: string;
+    province: string;
+    city: string;
+    district: string;
+    postalCode?: string;
+    latitude: string;
+    longitude: string;
+  }) => {
+    setForm((prev) => ({
+      ...prev,
+      address: data.address,
+      province: data.province,
+      city: data.city,
+      district: data.district,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      ...(data.postalCode !== undefined && { postalCode: data.postalCode }),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,6 +200,7 @@ export function PropertiEditForm({ editId }: { editId: string }) {
       rentPeriod: form.listingType === "rent" ? form.rentPeriod : null,
     });
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "Data tidak valid",
         description: getFirstZodError(parsed.error),
@@ -301,7 +302,7 @@ export function PropertiEditForm({ editId }: { editId: string }) {
             <div className="space-y-2">
               <Label>Tipe Properti *</Label>
               <Select value={form.type} onValueChange={(v) => update("type", v)}>
-                <SelectTrigger className="bg-background border-border w-full">
+                <SelectTrigger id="type" className="bg-background border-border w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -314,7 +315,7 @@ export function PropertiEditForm({ editId }: { editId: string }) {
             <div className="space-y-2">
               <Label>Tipe Listing *</Label>
               <Select value={form.listingType} onValueChange={(v) => update("listingType", v)}>
-                <SelectTrigger className="bg-background border-border w-full">
+                <SelectTrigger id="listingType" className="bg-background border-border w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -374,47 +375,36 @@ export function PropertiEditForm({ editId }: { editId: string }) {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-card">
-        <CardHeader><CardTitle className="text-lg">Lokasi</CardTitle></CardHeader>
+      <Card id="field-address" className="border-border bg-card">
+        <CardHeader>
+          <CardTitle className="text-lg">Lokasi</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Gunakan peta untuk menentukan titik lokasi, atau pilih alamat dari API.
+          </p>
+        </CardHeader>
         <CardContent className="space-y-4">
+          <AddressSelector
+            value={{
+              address: form.address,
+              province: form.province,
+              city: form.city,
+              district: form.district,
+              latitude: form.latitude,
+              longitude: form.longitude,
+              postalCode: form.postalCode,
+            }}
+            onChange={handleAddressChange}
+          />
           <div className="space-y-2">
-            <Label htmlFor="address">Alamat Lengkap *</Label>
-            <Textarea id="address" value={form.address} onChange={(e) => update("address", e.target.value)} rows={2} required className="bg-background border-border" />
+            <Label htmlFor="postalCode">Kode Pos (opsional)</Label>
+            <Input
+              id="postalCode"
+              value={form.postalCode}
+              onChange={(e) => update("postalCode", e.target.value)}
+              placeholder="12110"
+              className="bg-background border-border"
+            />
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="province">Provinsi *</Label>
-              <Input id="province" value={form.province} onChange={(e) => update("province", e.target.value)} required className="bg-background border-border" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="city">Kota/Kabupaten *</Label>
-              <Input id="city" value={form.city} onChange={(e) => update("city", e.target.value)} required className="bg-background border-border" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="district">Kecamatan *</Label>
-              <Input id="district" value={form.district} onChange={(e) => update("district", e.target.value)} required className="bg-background border-border" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="postalCode">Kode Pos</Label>
-              <Input id="postalCode" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} className="bg-background border-border" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="latitude">Latitude *</Label>
-              <Input id="latitude" type="number" step="any" value={form.latitude} onChange={(e) => update("latitude", e.target.value)} required className="bg-background border-border" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="longitude">Longitude *</Label>
-              <Input id="longitude" type="number" step="any" value={form.longitude} onChange={(e) => update("longitude", e.target.value)} required className="bg-background border-border" />
-            </div>
-          </div>
-          <Button type="button" variant="outline" onClick={handleGetLocation} disabled={locationLoading} className="border-border">
-            {locationLoading ? <Loader2 className="size-4 animate-spin mr-2" /> : <MapPin className="size-4 mr-2" />}
-            Ambil Lokasi Saat Ini
-          </Button>
         </CardContent>
       </Card>
 

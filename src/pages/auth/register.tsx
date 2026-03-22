@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
-import { registerSchema, getFirstZodError } from "@/lib/schemas";
+import { registerSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 
 interface RegisterFormData {
   username: string;
@@ -54,6 +54,7 @@ export default function Register() {
 
     const parsed = registerSchema.safeParse(formData);
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "Error",
         description: getFirstZodError(parsed.error),

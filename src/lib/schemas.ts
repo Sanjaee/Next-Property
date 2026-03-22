@@ -12,8 +12,8 @@ export const propertiFormSchema = z
   .object({
     name: z.string().min(1, "Nama wajib diisi").max(255, "Nama maksimal 255 karakter"),
     description: z.string().min(1, "Deskripsi wajib diisi"),
-    type: z.enum(TIPE_PROPERTI_VALUES, { errorMap: () => ({ message: "Tipe properti tidak valid" }) }),
-    listingType: z.enum(TIPE_LISTING_VALUES, { errorMap: () => ({ message: "Tipe listing tidak valid" }) }),
+    type: z.enum(TIPE_PROPERTI_VALUES, "Tipe properti tidak valid"),
+    listingType: z.enum(TIPE_LISTING_VALUES, "Tipe listing tidak valid"),
     price: z.string().min(1, "Harga wajib diisi").refine((v) => !Number.isNaN(Number(v)) && Number(v) >= 0, "Harga harus angka positif"),
     priceUnit: z.enum(PRICE_UNIT_VALUES).default("IDR"),
     rentPeriod: z.enum(RENT_PERIOD_VALUES).optional().nullable(),
@@ -136,6 +136,43 @@ export type ContactFormData = z.infer<typeof contactFormSchema>;
 // Helper
 // ===========================================
 export function getFirstZodError(error: z.ZodError): string {
-  const first = error.errors[0];
-  return first ? first.message : "Data tidak valid";
+  const issues = "issues" in error ? (error as { issues?: Array<{ message?: string }> }).issues : [];
+  const first = issues?.[0];
+  return (first && "message" in first ? first.message : undefined) ?? "Data tidak valid";
+}
+
+/** Returns first error's field path for scroll/focus (e.g. "name", "rentPeriod") */
+export function getFirstZodErrorPath(error: z.ZodError): string | undefined {
+  const issues = "issues" in error ? (error as { issues?: Array<{ path?: (string | number)[] }> }).issues : [];
+  const first = issues?.[0];
+  const path = first && "path" in first ? first.path : undefined;
+  if (Array.isArray(path) && path.length > 0) {
+    return String(path[0]);
+  }
+  return undefined;
+}
+
+const LOCATION_FIELDS = ["address", "province", "city", "district", "latitude", "longitude"];
+
+/** Scroll to invalid field and add red blink. Call after Zod validation fails. */
+export function scrollToInvalidField(error: z.ZodError): void {
+  const path = getFirstZodErrorPath(error);
+  if (!path || typeof document === "undefined") return;
+
+  const id = LOCATION_FIELDS.includes(path) ? "field-address" : path;
+  const el = document.getElementById(id) ?? document.querySelector(`[data-field="${path}"]`);
+  if (!el) return;
+
+  el.scrollIntoView({ behavior: "smooth", block: "center" });
+  el.classList.add("input-error-blink");
+  const removeBlink = () => {
+    el.classList.remove("input-error-blink");
+    el.removeEventListener("input", removeBlink);
+    el.removeEventListener("change", removeBlink);
+    el.removeEventListener("blur", removeBlink);
+  };
+  el.addEventListener("input", removeBlink);
+  el.addEventListener("change", removeBlink);
+  el.addEventListener("blur", removeBlink);
+  setTimeout(removeBlink, 4000);
 }

@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
-import { newPasswordSchema, getFirstZodError } from "@/lib/schemas";
+import { newPasswordSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 
 export default function VerifyResetPassword() {
   const router = useRouter();
@@ -58,6 +58,7 @@ export default function VerifyResetPassword() {
       confirmPassword,
     });
     if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
       toast({
         title: "❌ Data Tidak Valid",
         description: getFirstZodError(parsed.error),
