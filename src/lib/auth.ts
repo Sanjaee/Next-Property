@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { db, users, otpCodes, sessions } from "@/db/index";
+import { db, users, otp_codes, sessions } from "@/db/index";
 import { eq, and, gt } from "drizzle-orm";
 import { generateOTP, sendVerificationEmail, sendVerificationEmailResetPassword } from "./nodemailer";
 
@@ -99,7 +99,7 @@ export const registerUser = async (data: {
   const otpCode = generateOTP();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  await db.insert(otpCodes).values({
+  await db.insert(otp_codes).values({
     userId: newUser.id,
     email: data.email,
     otpCode,
@@ -146,7 +146,7 @@ export const loginUser = async (email: string, password: string) => {
     const otpCode = generateOTP();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    await db.insert(otpCodes).values({
+    await db.insert(otp_codes).values({
       userId: user.id,
       email: user.email,
       otpCode,
@@ -201,13 +201,13 @@ export const verifyOTP = async (email: string, otpCode: string, type: string = "
   }
 
   // Find valid OTP
-  const validOtp = await db.query.otpCodes.findFirst({
+  const validOtp = await db.query.otp_codes.findFirst({
     where: and(
-      eq(otpCodes.userId, user.id),
-      eq(otpCodes.otpCode, otpCode),
-      eq(otpCodes.type, type),
-      eq(otpCodes.isUsed, false),
-      gt(otpCodes.expiresAt, new Date())
+      eq(otp_codes.userId, user.id),
+      eq(otp_codes.otpCode, otpCode),
+      eq(otp_codes.type, type),
+      eq(otp_codes.isUsed, false),
+      gt(otp_codes.expiresAt, new Date())
     ),
   });
 
@@ -217,9 +217,9 @@ export const verifyOTP = async (email: string, otpCode: string, type: string = "
 
   // Mark OTP as used
   await db
-    .update(otpCodes)
+    .update(otp_codes)
     .set({ isUsed: true })
-    .where(eq(otpCodes.id, validOtp.id));
+    .where(eq(otp_codes.id, validOtp.id));
 
   // If email verification, update user
   if (type === "email_verification") {
@@ -260,7 +260,7 @@ export const resendOTP = async (email: string, type: string = "email_verificatio
   const otpCode = generateOTP();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-  await db.insert(otpCodes).values({
+  await db.insert(otp_codes).values({
     userId: user.id,
     email: user.email,
     otpCode,
@@ -299,7 +299,7 @@ export const requestPasswordReset = async (email: string) => {
   const otpCode = generateOTP();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-  await db.insert(otpCodes).values({
+  await db.insert(otp_codes).values({
     userId: user.id,
     email: user.email,
     otpCode,
@@ -325,13 +325,13 @@ export const resetPassword = async (email: string, otpCode: string, newPassword:
   }
 
   // Verify OTP
-  const validOtp = await db.query.otpCodes.findFirst({
+  const validOtp = await db.query.otp_codes.findFirst({
     where: and(
-      eq(otpCodes.userId, user.id),
-      eq(otpCodes.otpCode, otpCode),
-      eq(otpCodes.type, "password_reset"),
-      eq(otpCodes.isUsed, false),
-      gt(otpCodes.expiresAt, new Date())
+      eq(otp_codes.userId, user.id),
+      eq(otp_codes.otpCode, otpCode),
+      eq(otp_codes.type, "password_reset"),
+      eq(otp_codes.isUsed, false),
+      gt(otp_codes.expiresAt, new Date())
     ),
   });
 
@@ -341,9 +341,9 @@ export const resetPassword = async (email: string, otpCode: string, newPassword:
 
   // Mark OTP as used
   await db
-    .update(otpCodes)
+    .update(otp_codes)
     .set({ isUsed: true })
-    .where(eq(otpCodes.id, validOtp.id));
+    .where(eq(otp_codes.id, validOtp.id));
 
   // Hash new password
   const hashedPassword = await hashPassword(newPassword);
