@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,24 +37,26 @@ interface AddressSelectorProps {
 const API_BASE = "https://alamat.thecloudalert.com/api";
 const MAX_OPTIONS_RENDER = 100;
 
-function SearchableSelect({
+function AddressFieldWithSelect({
   label,
   placeholder,
   options,
-  value,
+  selectedId,
+  displayValue,
   onSelect,
+  onCustomInput,
   disabled,
   loading,
-  loadingLabel = "Memuat...",
 }: {
   label: string;
   placeholder: string;
   options: AddressOption[];
-  value: string;
-  onSelect: (id: string) => void;
+  selectedId: string;
+  displayValue: string;
+  onSelect: (id: string, text: string) => void;
+  onCustomInput: (text: string) => void;
   disabled?: boolean;
   loading?: boolean;
-  loadingLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -65,38 +67,41 @@ function SearchableSelect({
   }, [options, search]);
   const displayed = useMemo(() => {
     const slice = filtered.slice(0, MAX_OPTIONS_RENDER);
-    const selectedInFull = value && options.find((o) => o.id === value);
-    if (selectedInFull && !slice.some((o) => o.id === value)) {
+    const selectedInFull = selectedId && options.find((o) => o.id === selectedId);
+    if (selectedInFull && !slice.some((o) => o.id === selectedId)) {
       return [selectedInFull, ...slice].slice(0, MAX_OPTIONS_RENDER);
     }
     return slice;
-  }, [filtered, value, options]);
-  const selected = options.find((o) => o.id === value);
+  }, [filtered, selectedId, options]);
   const hasMore = filtered.length > MAX_OPTIONS_RENDER;
 
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full justify-between bg-background font-normal"
-        disabled={disabled || loading}
-        onClick={() => setOpen(true)}
-      >
-        {loading ? (
-          <span className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            {loadingLabel}
-          </span>
-        ) : (
-          <span className="truncate">{selected?.text || placeholder}</span>
-        )}
-      </Button>
+      <div className="flex gap-2">
+        <Input
+          placeholder={placeholder}
+          value={displayValue}
+          onChange={(e) => {
+            onCustomInput(e.target.value);
+          }}
+          className="flex-1 bg-background"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled || loading}
+          onClick={() => setOpen(true)}
+          className="shrink-0"
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pilih"}
+        </Button>
+      </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
-            <DialogTitle>{label}</DialogTitle>
+            <DialogTitle>Pilih {label} dari daftar</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="relative">
@@ -110,16 +115,16 @@ function SearchableSelect({
             </div>
             <div className="max-h-60 overflow-y-auto">
               {displayed.length === 0 ? (
-                <p className="text-center py-4 text-muted-foreground text-sm">Tidak ada hasil</p>
+                <p className="text-center py-4 text-muted-foreground text-sm">Tidak ada di daftar. Ketik manual di kolom input.</p>
               ) : (
                 <div className="space-y-0.5">
                   {displayed.map((o) => (
                     <button
                       key={o.id}
                       type="button"
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors ${value === o.id ? "bg-muted font-medium" : ""}`}
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors ${selectedId === o.id ? "bg-muted font-medium" : ""}`}
                       onClick={() => {
-                        onSelect(o.id);
+                        onSelect(o.id, o.text);
                         setOpen(false);
                         setSearch("");
                       }}
@@ -156,7 +161,6 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
     return { lng: 106.8456, lat: -6.2088 };
   });
   const [mapKey, setMapKey] = useState(0);
-  const [showManualAddress, setShowManualAddress] = useState(false);
   const [streetDetail, setStreetDetail] = useState("");
 
   const [provinces, setProvinces] = useState<AddressOption[]>([]);
@@ -179,23 +183,25 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingSubDistricts, setLoadingSubDistricts] = useState(false);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
-  const [useManualInput, setUseManualInput] = useState(false);
 
-  const emitChange = useCallback(
-    (updates: Partial<AddressSelectorValue>) => {
-      const base: AddressSelectorValue = {
-        address: value?.address ?? "",
-        province: value?.province ?? "",
-        city: value?.city ?? "",
-        district: value?.district ?? "",
-        postalCode: value?.postalCode ?? "",
-        latitude: value?.latitude ?? "",
-        longitude: value?.longitude ?? "",
-      };
-      onChange({ ...base, ...updates });
-    },
-    [onChange, value]
-  );
+  const onChangeRef = useRef(onChange);
+  const valueRef = useRef(value);
+  onChangeRef.current = onChange;
+  valueRef.current = value;
+
+  const emitChange = useCallback((updates: Partial<AddressSelectorValue>) => {
+    const v = valueRef.current;
+    const base: AddressSelectorValue = {
+      address: v?.address ?? "",
+      province: v?.province ?? "",
+      city: v?.city ?? "",
+      district: v?.district ?? "",
+      postalCode: v?.postalCode ?? "",
+      latitude: v?.latitude ?? "",
+      longitude: v?.longitude ?? "",
+    };
+    onChangeRef.current({ ...base, ...updates });
+  }, []);
 
   // Sync province/city/district names from value (e.g. edit form)
   useEffect(() => {
@@ -212,9 +218,9 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
     if (Number.isNaN(lat) || Number.isNaN(lng)) return;
     setMarkerPosition((prev) => {
       if (Math.abs(prev.lat - lat) < 1e-6 && Math.abs(prev.lng - lng) < 1e-6) return prev;
-      setMapKey((k) => k + 1);
       return { lng, lat };
     });
+    setMapKey((k) => k + 1);
   }, [value?.latitude, value?.longitude]);
 
   const getCurrentLocation = useCallback(() => {
@@ -311,11 +317,9 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
         const data = await response.json();
         if (data.status === 200 && Array.isArray(data.result) && data.result.length > 0) {
           setProvinces(data.result);
-        } else {
-          setUseManualInput(true);
         }
       } catch {
-        setUseManualInput(true);
+        // API gagal, tetap bisa input manual
       } finally {
         setLoadingProvinces(false);
       }
@@ -343,11 +347,9 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
         const data = await response.json();
         if (data.status === 200 && Array.isArray(data.result) && data.result.length > 0) {
           setCities(data.result);
-        } else {
-          setUseManualInput(true);
         }
       } catch {
-        setUseManualInput(true);
+        // API gagal, tetap bisa input manual
       } finally {
         setLoadingCities(false);
       }
@@ -373,11 +375,9 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
         const data = await response.json();
         if (data.status === 200 && Array.isArray(data.result) && data.result.length > 0) {
           setDistricts(data.result);
-        } else {
-          setUseManualInput(true);
         }
       } catch {
-        setUseManualInput(true);
+        // API gagal, tetap bisa input manual
       } finally {
         setLoadingDistricts(false);
       }
@@ -401,11 +401,9 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
         const data = await response.json();
         if (data.status === 200 && Array.isArray(data.result) && data.result.length > 0) {
           setSubDistricts(data.result);
-        } else {
-          setUseManualInput(true);
         }
       } catch {
-        setUseManualInput(true);
+        // API gagal, tetap bisa input manual
       } finally {
         setLoadingSubDistricts(false);
       }
@@ -423,33 +421,25 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
         district: districtName,
       });
     } else if (streetDetail) {
-      // Manual input without admin selection
       emitChange({ address: streetDetail });
     }
   }, [provinceName, cityName, districtName, subDistrictName, streetDetail, emitChange]);
 
-  const handleProvinceChange = (val: string) => {
-    setSelectedProvince(val);
-    const p = provinces.find((x) => x.id === val);
-    setProvinceName(p?.text ?? "");
+  const handleProvinceSelect = (id: string, text: string) => {
+    setSelectedProvince(id);
+    setProvinceName(text);
   };
-
-  const handleCityChange = (val: string) => {
-    setSelectedCity(val);
-    const c = cities.find((x) => x.id === val);
-    setCityName(c?.text ?? "");
+  const handleCitySelect = (id: string, text: string) => {
+    setSelectedCity(id);
+    setCityName(text);
   };
-
-  const handleDistrictChange = (val: string) => {
-    setSelectedDistrict(val);
-    const d = districts.find((x) => x.id === val);
-    setDistrictName(d?.text ?? "");
+  const handleDistrictSelect = (id: string, text: string) => {
+    setSelectedDistrict(id);
+    setDistrictName(text);
   };
-
-  const handleSubDistrictChange = (val: string) => {
-    setSelectedSubDistrict(val);
-    const s = subDistricts.find((x) => x.id === val);
-    setSubDistrictName(s?.text ?? "");
+  const handleSubDistrictSelect = (id: string, text: string) => {
+    setSelectedSubDistrict(id);
+    setSubDistrictName(text);
   };
 
   const handleResetPosition = () => {
@@ -541,146 +531,79 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
         />
       </div>
 
-      {!showManualAddress ? (
-        <div className="p-3 bg-muted/50 rounded-lg border">
-          <p className="text-xs text-muted-foreground mb-1">Koordinat telah ditentukan</p>
-          <p className="text-sm font-medium flex items-center gap-1">
-            <MapPin className="h-4 w-4 text-primary shrink-0" />
-            {markerPosition.lat.toFixed(6)}, {markerPosition.lng.toFixed(6)}
-          </p>
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            onClick={() => setShowManualAddress(true)}
-            className="text-xs mt-2 p-0 h-auto"
-          >
-            + Pilih alamat administratif (Provinsi, Kota, Kecamatan)
-          </Button>
-        </div>
-      ) : (
-        <div className="border-t pt-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              {useManualInput ? "Input alamat secara manual" : "Alamat administratif dari API"}
+      <div className="border-t pt-4 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Ketik manual atau pilih dari daftar API. Jika tidak ada di daftar, ketik langsung.
+        </p>
+
+        <AddressFieldWithSelect
+          label="Provinsi"
+          placeholder="Ketik atau pilih Provinsi"
+          options={provinces}
+          selectedId={selectedProvince}
+          displayValue={provinceName}
+          onSelect={handleProvinceSelect}
+          onCustomInput={(text) => {
+            setProvinceName(text);
+            setSelectedProvince("");
+          }}
+          loading={loadingProvinces}
+        />
+        <AddressFieldWithSelect
+          label="Kabupaten/Kota"
+          placeholder="Ketik atau pilih Kabupaten/Kota"
+          options={cities}
+          selectedId={selectedCity}
+          displayValue={cityName}
+          onSelect={handleCitySelect}
+          onCustomInput={(text) => {
+            setCityName(text);
+            setSelectedCity("");
+          }}
+          disabled={!selectedProvince}
+          loading={loadingCities}
+        />
+        <AddressFieldWithSelect
+          label="Kecamatan"
+          placeholder="Ketik atau pilih Kecamatan"
+          options={districts}
+          selectedId={selectedDistrict}
+          displayValue={districtName}
+          onSelect={handleDistrictSelect}
+          onCustomInput={(text) => {
+            setDistrictName(text);
+            setSelectedDistrict("");
+          }}
+          disabled={!selectedCity}
+          loading={loadingDistricts}
+        />
+        <AddressFieldWithSelect
+          label="Kelurahan/Desa"
+          placeholder="Ketik atau pilih Kelurahan/Desa (opsional)"
+          options={subDistricts}
+          selectedId={selectedSubDistrict}
+          displayValue={subDistrictName}
+          onSelect={handleSubDistrictSelect}
+          onCustomInput={(text) => {
+            setSubDistrictName(text);
+            setSelectedSubDistrict("");
+          }}
+          disabled={!selectedDistrict}
+          loading={loadingSubDistricts}
+        />
+
+        {(provinceName || cityName || districtName) && (
+          <div className="p-3 bg-muted/50 rounded-lg border">
+            <p className="text-xs text-muted-foreground mb-1">Alamat:</p>
+            <p className="text-sm font-medium flex items-center gap-1">
+              <MapPin className="h-4 w-4 text-primary shrink-0" />
+              {[streetDetail, subDistrictName, districtName, cityName, provinceName]
+                .filter(Boolean)
+                .join(", ")}
             </p>
-            <div className="flex items-center gap-2">
-              {!useManualInput && provinces.length > 0 && (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  onClick={() => setUseManualInput(true)}
-                  className="text-xs h-6 px-2"
-                >
-                  Ketik manual
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowManualAddress(false)}
-                className="text-xs h-6 px-2"
-              >
-                Sembunyikan
-              </Button>
-            </div>
           </div>
-
-          {useManualInput ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Provinsi</Label>
-                <Input
-                  placeholder="Contoh: DKI Jakarta"
-                  value={provinceName}
-                  onChange={(e) => setProvinceName(e.target.value)}
-                  className="bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Kabupaten/Kota</Label>
-                <Input
-                  placeholder="Contoh: Jakarta Selatan"
-                  value={cityName}
-                  onChange={(e) => setCityName(e.target.value)}
-                  className="bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Kecamatan</Label>
-                <Input
-                  placeholder="Contoh: Kebayoran Baru"
-                  value={districtName}
-                  onChange={(e) => setDistrictName(e.target.value)}
-                  className="bg-background"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Kelurahan/Desa (opsional)</Label>
-                <Input
-                  placeholder="Contoh: Gunung"
-                  value={subDistrictName}
-                  onChange={(e) => setSubDistrictName(e.target.value)}
-                  className="bg-background"
-                />
-              </div>
-            </div>
-          ) : (
-            <>
-              <SearchableSelect
-                label="Provinsi"
-                placeholder="Pilih Provinsi"
-                options={provinces}
-                value={selectedProvince}
-                onSelect={handleProvinceChange}
-                disabled={false}
-                loading={loadingProvinces}
-              />
-              <SearchableSelect
-                label="Kabupaten/Kota"
-                placeholder="Pilih Kabupaten/Kota"
-                options={cities}
-                value={selectedCity}
-                onSelect={handleCityChange}
-                disabled={!selectedProvince}
-                loading={loadingCities}
-              />
-              <SearchableSelect
-                label="Kecamatan"
-                placeholder="Pilih Kecamatan"
-                options={districts}
-                value={selectedDistrict}
-                onSelect={handleDistrictChange}
-                disabled={!selectedCity}
-                loading={loadingDistricts}
-              />
-              <SearchableSelect
-                label="Kelurahan/Desa (opsional)"
-                placeholder="Pilih Kelurahan/Desa"
-                options={subDistricts}
-                value={selectedSubDistrict}
-                onSelect={handleSubDistrictChange}
-                disabled={!selectedDistrict}
-                loading={loadingSubDistricts}
-              />
-            </>
-          )}
-
-          {provinceName && cityName && districtName && (
-            <div className="p-3 bg-muted/50 rounded-lg border">
-              <p className="text-xs text-muted-foreground mb-1">Alamat terpilih:</p>
-              <p className="text-sm font-medium flex items-center gap-1">
-                <MapPin className="h-4 w-4 text-primary shrink-0" />
-                {[streetDetail, subDistrictName, districtName, cityName, provinceName]
-                  .filter(Boolean)
-                  .join(", ")}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
