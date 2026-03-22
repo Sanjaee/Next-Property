@@ -16,7 +16,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { PropertiImageUpload, type ImageItemType } from "./PropertiImageUpload";
 import { propertiFormSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
 import { AddressSelector } from "@/components/address/AddressSelector";
 
@@ -64,66 +65,11 @@ export function PropertiTambahForm() {
   const router = useRouter();
   const { toast } = useToast();
   const [form, setForm] = useState(initialForm);
-  const [imageFiles, setImageFiles] = useState<string[]>([]);
+  const [imageItems, setImageItems] = useState<ImageItemType[]>([]);
   const [submitLoading, setSubmitLoading] = useState(false);
 
   const update = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const MAX_IMAGES = 10;
-  const MAX_SIZE_MB = 3;
-
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (files.length === 0) return;
-    e.target.value = "";
-
-    const remaining = MAX_IMAGES - imageFiles.length;
-    if (files.length > remaining) {
-      toast({
-        title: "Batas gambar tercapai",
-        description: `Maksimal ${MAX_IMAGES} gambar. Anda dapat menambah ${remaining} gambar lagi.`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const validFiles: File[] = [];
-    for (const file of files) {
-      if (!file.type.startsWith("image/")) {
-        toast({
-          title: "Format tidak valid",
-          description: `${file.name}: Hanya JPG, PNG, WEBP yang didukung.`,
-          variant: "destructive",
-        });
-        continue;
-      }
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        toast({
-          title: "Ukuran terlalu besar",
-          description: `${file.name}: Maksimal ${MAX_SIZE_MB}MB per gambar.`,
-          variant: "destructive",
-        });
-        continue;
-      }
-      validFiles.push(file);
-    }
-
-    validFiles.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImageFiles((prev) => {
-          const next = [...prev, reader.result as string];
-          return next.slice(0, MAX_IMAGES);
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleAddressChange = (data: {
@@ -170,7 +116,8 @@ export function PropertiTambahForm() {
     setSubmitLoading(true);
     try {
       const imageUrls: string[] = [];
-      for (const img of imageFiles) {
+      for (const item of imageItems) {
+        const img = item.src;
         const uploadRes = await fetch("/api/upload/cloudinary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -372,49 +319,10 @@ export function PropertiTambahForm() {
         </CardContent>
       </Card>
 
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-lg">Gambar (Opsional)</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Unggah foto properti. Maks. 10 gambar, {MAX_SIZE_MB}MB per gambar.
-            Format: JPG, PNG, WEBP.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {imageFiles.map((src, i) => (
-              <div key={i} className="relative aspect-video rounded-lg overflow-hidden border border-border group">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="icon"
-                  className="absolute top-1 right-1 size-7 rounded-full opacity-90 group-hover:opacity-100"
-                  onClick={() => removeImage(i)}
-                >
-                  <X className="size-3.5" />
-                </Button>
-              </div>
-            ))}
-            {imageFiles.length < MAX_IMAGES && (
-              <label className="flex flex-col items-center justify-center aspect-video border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  multiple
-                  onChange={handleImageSelect}
-                  className="hidden"
-                />
-                <Upload className="size-8 text-muted-foreground mb-1" />
-                <span className="text-xs text-muted-foreground text-center px-2">
-                  Tambah ({imageFiles.length}/{MAX_IMAGES})
-                </span>
-              </label>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <PropertiImageUpload
+        images={imageItems}
+        onImagesChange={setImageItems}
+      />
 
       <div className="flex gap-3">
         <Button
