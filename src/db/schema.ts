@@ -48,6 +48,11 @@ export const certificateTypeEnum = pgEnum("certificate_type", [
   "girik",
   "other",
 ]);
+export const imageTypeEnum = pgEnum("image_type", [
+  "thumbnail",
+  "gallery",
+  "video",
+]);
 
 // =========================================
 // Users table
@@ -58,7 +63,7 @@ export const users = pgTable("users", {
   username: varchar("username", { length: 50 }).unique(),
   phone: varchar("phone", { length: 20 }),
   fullName: varchar("full_name", { length: 255 }).notNull(),
-  password: text("password"), // nullable for Google OAuth users
+  password: text("password"),
   userType: userTypeEnum("user_type").default("member").notNull(),
   profilePhoto: text("profile_photo"),
   dateOfBirth: timestamp("date_of_birth"),
@@ -73,7 +78,7 @@ export const users = pgTable("users", {
 });
 
 // =========================================
-// Sessions table - untuk refresh tokens
+// Sessions table
 // =========================================
 export const sessions = pgTable("sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -88,31 +93,31 @@ export const sessions = pgTable("sessions", {
 });
 
 // =========================================
-// OTP Codes table - untuk verifikasi email dan reset password
+// OTP Codes table
 // =========================================
-export const otpCodes = pgTable("otp_codes", {
+export const otp_codes = pgTable("otp_codes", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
   email: varchar("email", { length: 255 }).notNull(),
   otpCode: varchar("otp_code", { length: 6 }).notNull(),
-  type: varchar("type", { length: 50 }).notNull(), // "email_verification" | "password_reset"
+  type: varchar("type", { length: 50 }).notNull(),
   isUsed: boolean("is_used").default(false).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // =========================================
-// Verification tokens table - untuk email verification link
+// Verification tokens table
 // =========================================
-export const verificationTokens = pgTable("verification_tokens", {
+export const verification_tokens = pgTable("verification_tokens", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
   token: text("token").notNull().unique(),
-  type: varchar("type", { length: 50 }).notNull(), // "email_verification" | "password_reset"
+  type: varchar("type", { length: 50 }).notNull(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -137,7 +142,7 @@ export const properti = pgTable("properti", {
   // Harga
   price: decimal("price", { precision: 15, scale: 2 }).notNull(),
   priceUnit: priceUnitEnum("price_unit").default("IDR").notNull(),
-  rentPeriod: rentPeriodEnum("rent_period"), // nullable jika listing_type = sale
+  rentPeriod: rentPeriodEnum("rent_period"),
 
   // Lokasi
   address: text("address").notNull(),
@@ -147,10 +152,6 @@ export const properti = pgTable("properti", {
   postalCode: varchar("postal_code", { length: 10 }),
   latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
   longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
-
-  // Media
-  thumbnail: text("thumbnail").notNull(),
-  videoUrl: text("video_url"),
 
   // SEO
   metaTitle: varchar("meta_title", { length: 255 }),
@@ -163,18 +164,35 @@ export const properti = pgTable("properti", {
 });
 
 // =========================================
+// Properti Images table
+// - image_type = "thumbnail" → foto cover utama
+// - image_type = "gallery"   → foto galeri
+// - image_type = "video"     → url video
+// =========================================
+export const properti_images = pgTable("properti_images", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  propertiId: uuid("properti_id")
+    .references(() => properti.id, { onDelete: "cascade" })
+    .notNull(),
+  imageUrl: text("image_url").notNull(),
+  imageType: imageTypeEnum("image_type").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// =========================================
 // Detail Properti table - one-to-one dengan properti
 // =========================================
-export const detailProperti = pgTable("detail_properti", {
+export const detail_properti = pgTable("detail_properti", {
   id: uuid("id").defaultRandom().primaryKey(),
   propertiId: uuid("properti_id")
     .references(() => properti.id, { onDelete: "cascade" })
     .notNull()
-    .unique(), // one-to-one
+    .unique(),
 
   // Ukuran
-  landArea: decimal("land_area", { precision: 10, scale: 2 }),        // m²
-  buildingArea: decimal("building_area", { precision: 10, scale: 2 }), // m²
+  landArea: decimal("land_area", { precision: 10, scale: 2 }),
+  buildingArea: decimal("building_area", { precision: 10, scale: 2 }),
   floorCount: integer("floor_count"),
 
   // Kamar
@@ -199,27 +217,12 @@ export const detailProperti = pgTable("detail_properti", {
   hasParking: boolean("has_parking").default(false).notNull(),
 
   // Utilitas
-  electricityCapacity: integer("electricity_capacity"), // watt
+  electricityCapacity: integer("electricity_capacity"),
   waterSource: varchar("water_source", { length: 100 }),
 
   additionalNotes: text("additional_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// =========================================
-// Properti Images table - galeri foto
-// =========================================
-export const propertiImages = pgTable("properti_images", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  propertiId: uuid("properti_id")
-    .references(() => properti.id, { onDelete: "cascade" })
-    .notNull(),
-  imageUrl: text("image_url").notNull(),
-  caption: varchar("caption", { length: 255 }),
-  isPrimary: boolean("is_primary").default(false).notNull(),
-  sortOrder: integer("sort_order").default(0).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // =========================================
@@ -231,15 +234,15 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
-export type OtpCode = typeof otpCodes.$inferSelect;
-export type NewOtpCode = typeof otpCodes.$inferInsert;
-export type VerificationToken = typeof verificationTokens.$inferSelect;
-export type NewVerificationToken = typeof verificationTokens.$inferInsert;
+export type OtpCode = typeof otp_codes.$inferSelect;
+export type NewOtpCode = typeof otp_codes.$inferInsert;
+export type VerificationToken = typeof verification_tokens.$inferSelect;
+export type NewVerificationToken = typeof verification_tokens.$inferInsert;
 
 // Properti
 export type Properti = typeof properti.$inferSelect;
 export type NewProperti = typeof properti.$inferInsert;
-export type DetailProperti = typeof detailProperti.$inferSelect;
-export type NewDetailProperti = typeof detailProperti.$inferInsert;
-export type PropertiImage = typeof propertiImages.$inferSelect;
-export type NewPropertiImage = typeof propertiImages.$inferInsert;
+export type DetailProperti = typeof detail_properti.$inferSelect;
+export type NewDetailProperti = typeof detail_properti.$inferInsert;
+export type PropertiImage = typeof properti_images.$inferSelect;
+export type NewPropertiImage = typeof properti_images.$inferInsert;

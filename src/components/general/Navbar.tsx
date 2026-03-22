@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
 import { useRouter } from "next/router";
 import {
   DropdownMenu,
@@ -13,10 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { LogOut, User, Settings } from "lucide-react";
+import { useMapUI } from "@/components/contex/MapUIContext";
+import { LogOut, User, Settings, Moon, Sun, Plus, Map, Check } from "lucide-react";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
+  const { theme, setTheme } = useTheme();
+  const mapUI = useMapUI();
   const router = useRouter();
   const isLoading = status === "loading";
 
@@ -57,8 +61,31 @@ export default function Navbar() {
           </Button>
         </div>
 
-        {/* Right side - Auth buttons */}
-        <div className="flex items-center gap-4">
+        {/* Right side - Auth */}
+        <div className="flex items-center gap-3">
+          {!session?.user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="relative shrink-0 size-9"
+            >
+              <Sun className="size-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute size-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle dark mode</span>
+            </Button>
+          )}
+          {session?.user && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/properti/tambah")}
+              className="shrink-0"
+            >
+              <Plus className="size-4 mr-1.5" />
+              Tambah Properti
+            </Button>
+          )}
           {isLoading ? (
             <div className="h-9 w-20 animate-pulse rounded-md bg-muted" />
           ) : session?.user ? (
@@ -102,6 +129,32 @@ export default function Navbar() {
                     </div>
                   </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="cursor-pointer"
+                >
+                  {theme === "dark" ? (
+                    <Sun className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Moon className="mr-2 h-4 w-4" />
+                  )}
+                  {theme === "dark" ? "Mode Terang" : "Mode Gelap"}
+                </DropdownMenuItem>
+                {mapUI && (
+                  <DropdownMenuItem
+                    onClick={() => mapUI.setShowViewportOverlay(!mapUI.showViewportOverlay)}
+                    className="cursor-pointer justify-between"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Map className="h-4 w-4" />
+                      Viewport (lng, lat, zoom)
+                    </span>
+                    {mapUI.showViewportOverlay && (
+                      <Check className="h-4 w-4" />
+                    )}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => router.push("/profile")}

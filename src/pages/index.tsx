@@ -16,10 +16,10 @@ const geistMono = Geist_Mono({
 export default function Home() {
   return (
     <div
-      className={`${geistSans.className} ${geistMono.className} flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-black`}
+      className={`${geistSans.className} ${geistMono.className} flex min-h-screen flex-col bg-background font-sans text-foreground`}
     >
       <Navbar />
-      <Card className="h-screen p-0 overflow-hidden flex flex-col">
+      <Card className="h-screen p-0 overflow-hidden flex flex-col border-border bg-card">
         <div className="flex-1 min-h-0">
           <UnifiedMap />
         </div>

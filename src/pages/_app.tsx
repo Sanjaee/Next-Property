@@ -4,6 +4,7 @@ import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { ApiProvider } from "@/components/contex/ApiProvider";
+import { MapUIProvider } from "@/components/contex/MapUIContext";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -26,8 +27,10 @@ export default function App({
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         <SessionProvider session={session}>
           <ApiProvider>
-            <Component {...pageProps} />
-            <Toaster />
+            <MapUIProvider>
+              <Component {...pageProps} />
+              <Toaster />
+            </MapUIProvider>
           </ApiProvider>
         </SessionProvider>
       </ThemeProvider>
