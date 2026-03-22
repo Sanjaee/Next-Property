@@ -15,6 +15,13 @@
       "when": 1774169477599,
       "tag": "0001_lazy_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774195022507,
+      "tag": "0002_natural_korg",
+      "breakpoints": true
     }
   ]
 }

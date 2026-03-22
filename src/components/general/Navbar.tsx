@@ -20,7 +20,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useMapUI, type MapStyleKey } from "@/components/contex/MapUIContext";
-import { LogOut, User, Settings, Moon, Sun, Plus, Map, Check, Globe } from "lucide-react";
+import { LogOut, User, Settings, Moon, Sun, Plus, Map, Check, Globe, Shield } from "lucide-react";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -81,15 +81,28 @@ export default function Navbar() {
             </Button>
           )}
           {session?.user && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/properti/tambah")}
-              className="shrink-0"
-            >
-              <Plus className="size-4 mr-1.5" />
-              Tambah Properti
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/properti/tambah")}
+                className="shrink-0"
+              >
+                <Plus className="size-4 mr-1.5" />
+                Tambah Properti
+              </Button>
+              {(session.user as { role?: string })?.role === "admin" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push("/admin")}
+                  className="shrink-0"
+                >
+                  <Shield className="size-4 mr-1.5" />
+                  Admin
+                </Button>
+              )}
+            </>
           )}
           {isLoading ? (
             <div className="h-9 w-20 animate-pulse rounded-md bg-muted" />

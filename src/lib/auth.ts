@@ -89,7 +89,7 @@ export const registerUser = async (data: {
       email: data.email,
       password: hashedPassword,
       fullName: data.fullName,
-      userType: (data.userType as "member" | "admin" | "moderator") || "member",
+      userType: (data.userType as "member" | "admin" | "premium") || "member",
       loginType: "credential",
       isVerified: false,
     })

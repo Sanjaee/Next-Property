@@ -214,7 +214,7 @@ export default function VerifyOtp() {
           toast({
             title: "🎉 Berhasil!",
             description:
-              "Email berhasil diverifikasi! Selamat datang di template zacode. Mengalihkan...",
+              "Email berhasil diverifikasi! Selamat datang di zacode. Mengalihkan...",
           });
           // Clear session storage
           sessionStorage.removeItem("registration_email");

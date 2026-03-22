@@ -6,10 +6,14 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Routes that require authentication
-  const protectedRoutes = ["/profile", "/settings", "/post", "/update"];
+  const protectedRoutes = ["/profile", "/settings", "/post", "/update", "/admin"];
   const isProtectedRoute = protectedRoutes.some((route) =>
     pathname.startsWith(route)
   );
+
+  // Admin-only routes (must be admin role)
+  const adminRoutes = ["/admin"];
+  const isAdminRoute = adminRoutes.some((route) => pathname.startsWith(route));
 
   // Routes that should redirect if already authenticated
   const authRoutes = ["/auth/login", "/auth/register"];
@@ -25,6 +29,11 @@ export async function middleware(request: NextRequest) {
       const url = new URL("/auth/login", request.url);
       url.searchParams.set("callbackUrl", encodeURIComponent(request.url));
       return NextResponse.redirect(url);
+    }
+
+    // Admin routes: only role "admin" can access
+    if (isAdminRoute && token.role !== "admin") {
+      return NextResponse.redirect(new URL("/", request.url));
     }
   }
 

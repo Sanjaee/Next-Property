@@ -13,7 +13,7 @@ import {
 // =========================================
 // Enums — Auth
 // =========================================
-export const userTypeEnum = pgEnum("user_type", ["member", "admin", "moderator"]);
+export const userTypeEnum = pgEnum("user_type", ["member", "admin", "premium"]);
 export const loginTypeEnum = pgEnum("login_type", ["credential", "google"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 
