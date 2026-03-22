@@ -15,7 +15,7 @@ import {
   type MapViewport,
 } from "@/components/ui/map";
 import { Button } from "@/components/ui/button";
-import { Navigation, ExternalLink, MapPin, Loader2, Clock, Route, X } from "lucide-react";
+import { ExternalLink, MapPin, Loader2, Clock, Route, X } from "lucide-react";
 import { useMapUI } from "@/components/contex/MapUIContext";
 
 export interface PropertiMapItem {
@@ -113,7 +113,9 @@ function PropertyPopupContent({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {typeLabels[p.type] ?? p.type} • {p.listingType === "rent" ? "Sewa" : "Jual"}
           </span>
-          <h3 className="font-semibold text-foreground leading-tight">{p.name}</h3>
+          <h3 className="font-semibold text-foreground leading-tight">
+            <a href={`/properti/${p.slug}`} className="hover:underline">{p.name}</a>
+          </h3>
           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
             <MapPin className="size-3 shrink-0" />
             {p.district}, {p.city}
@@ -135,9 +137,9 @@ function PropertyPopupContent({
               {routeLoading ? (
                 <Loader2 className="size-3.5 animate-spin mr-1.5" />
               ) : (
-                <Navigation className="size-3.5 mr-1.5" />
+                <Route className="size-3.5 mr-1.5" />
               )}
-              Tampilkan Rute
+              Rute Jarak
             </Button>
             <Button size="sm" variant="outline" className="h-8" asChild>
               <a
@@ -149,9 +151,6 @@ function PropertyPopupContent({
               </a>
             </Button>
           </div>
-          <Button size="sm" variant="outline" className="h-8" asChild>
-            <a href={`/properti/${p.slug}`}>Lihat Detail</a>
-          </Button>
         </div>
       </div>
     </div>
@@ -169,7 +168,8 @@ export function UnifiedMap() {
   const [selectedProperty, setSelectedProperty] = useState<PropertiMapItem | null>(null);
   const [routeToProperty, setRouteToProperty] = useState<PropertiMapItem | null>(null);
   const [userLocation, setUserLocation] = useState<{ lng: number; lat: number } | null>(null);
-  const [routeData, setRouteData] = useState<RouteData | null>(null);
+  const [routes, setRoutes] = useState<RouteData[]>([]);
+  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [routeLoading, setRouteLoading] = useState(false);
 
   const propertiesGeoJSON = useMemo((): GeoJSON.FeatureCollection<GeoJSON.Point, PropertiMapItem> => {
@@ -191,13 +191,15 @@ export function UnifiedMap() {
   const clearRoute = () => {
     setRouteToProperty(null);
     setUserLocation(null);
-    setRouteData(null);
+    setRoutes([]);
+    setSelectedRouteIndex(0);
   };
 
   const showRouteToProperty = async (property: PropertiMapItem) => {
     if (!navigator.geolocation) return;
     setRouteLoading(true);
-    setRouteData(null);
+    setRoutes([]);
+    setSelectedRouteIndex(0);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const userLng = pos.coords.longitude;
@@ -206,16 +208,18 @@ export function UnifiedMap() {
         setRouteToProperty(property);
         try {
           const res = await fetch(
-            `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${property.longitude},${property.latitude}?overview=full&geometries=geojson`
+            `https://router.project-osrm.org/route/v1/driving/${userLng},${userLat};${property.longitude},${property.latitude}?overview=full&geometries=geojson&alternatives=true`
           );
           const data = await res.json();
           if (data.routes?.length > 0) {
-            const route = data.routes[0];
-            setRouteData({
-              coordinates: route.geometry.coordinates,
-              duration: route.duration,
-              distance: route.distance,
-            });
+            const routeData: RouteData[] = data.routes.map(
+              (r: { geometry: { coordinates: [number, number][] }; duration: number; distance: number }) => ({
+                coordinates: r.geometry.coordinates,
+                duration: r.duration,
+                distance: r.distance,
+              })
+            );
+            setRoutes(routeData);
           }
         } catch (err) {
           console.error("Route fetch error:", err);
@@ -239,14 +243,28 @@ export function UnifiedMap() {
   return (
     <div className="h-full w-full relative min-h-[500px]">
       <Map viewport={viewport} onViewportChange={setViewport}>
-        {routeData && (
-          <MapRoute
-            coordinates={routeData.coordinates}
-            color="#18181b"
-            width={5}
-            opacity={0.9}
-          />
-        )}
+        {(() => {
+          const sortedRoutes = routes
+            .map((route, index) => ({ route, index }))
+            .sort((a, b) => {
+              if (a.index === selectedRouteIndex) return 1;
+              if (b.index === selectedRouteIndex) return -1;
+              return 0;
+            });
+          return sortedRoutes.map(({ route, index }) => {
+            const isSelected = index === selectedRouteIndex;
+            return (
+              <MapRoute
+                key={index}
+                coordinates={route.coordinates}
+                color={isSelected ? "#6366f1" : "#94a3b8"}
+                width={isSelected ? 6 : 5}
+                opacity={isSelected ? 1 : 0.6}
+                onClick={() => setSelectedRouteIndex(index)}
+              />
+            );
+          });
+        })()}
 
         {userLocation && (
           <MapMarker longitude={userLocation.lng} latitude={userLocation.lat}>
@@ -314,17 +332,12 @@ export function UnifiedMap() {
         />
       </Map>
 
-      {routeData && routeToProperty && (
-        <div className="absolute top-20 left-2 z-[100] flex flex-col gap-2">
-          <div className="flex items-center gap-2 bg-background/90 backdrop-blur px-3 py-2 rounded border border-border shadow-sm">
-            <div className="flex items-center gap-1.5">
-              <Clock className="size-4 text-muted-foreground" />
-              <span className="font-medium">{formatDuration(routeData.duration)}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Route className="size-3.5" />
-              {formatDistance(routeData.distance)}
-            </div>
+      {routes.length > 0 && routeToProperty && (
+        <div className="absolute top-20 left-2 z-[100] flex flex-col gap-2 bg-background/90 backdrop-blur px-3 py-2 rounded-lg border border-border shadow-sm">
+          <div className="flex items-center justify-between gap-2 mb-0.5">
+            <p className="text-xs text-muted-foreground">
+              Ke: {routeToProperty.name}
+            </p>
             <Button
               variant="ghost"
               size="icon"
@@ -334,16 +347,44 @@ export function UnifiedMap() {
               <X className="size-3.5" />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground bg-background/80 px-2 py-1 rounded">
-            Ke: {routeToProperty.name}
-          </p>
+          <div className="flex flex-col gap-2">
+            {routes.map((route, index) => {
+              const isActive = index === selectedRouteIndex;
+              const isFastest = index === 0;
+              return (
+                <Button
+                  key={index}
+                  variant={isActive ? "default" : "secondary"}
+                  size="sm"
+                  onClick={() => setSelectedRouteIndex(index)}
+                  className="justify-start gap-3"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="size-3.5" />
+                    <span className="font-medium">
+                      {formatDuration(route.duration)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs opacity-80">
+                    <Route className="size-3" />
+                    {formatDistance(route.distance)}
+                  </div>
+                  {isFastest && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                      Tercepat
+                    </span>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {mapUI?.showViewportOverlay && (
         <div
           className="absolute z-[100] flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono bg-background/90 backdrop-blur px-2 py-1.5 rounded border border-border shadow-sm"
-          style={{ top: routeData ? "8.5rem" : "5rem" }}
+          style={{ top: routes.length > 0 ? "8.5rem" : "5rem" }}
         >
           <span>
             <span className="text-muted-foreground">lng:</span>{" "}
