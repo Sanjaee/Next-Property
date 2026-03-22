@@ -1,19 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Map, MapMarker, MarkerContent } from "@/components/ui/map";
-import { Loader2, MapPin, Navigation, RefreshCw } from "lucide-react";
+import { Loader2, MapPin, Navigation, RefreshCw, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface AddressOption {
   id: string;
@@ -36,6 +35,112 @@ interface AddressSelectorProps {
 }
 
 const API_BASE = "https://alamat.thecloudalert.com/api";
+const MAX_OPTIONS_RENDER = 100;
+
+function SearchableSelect({
+  label,
+  placeholder,
+  options,
+  value,
+  onSelect,
+  disabled,
+  loading,
+  loadingLabel = "Memuat...",
+}: {
+  label: string;
+  placeholder: string;
+  options: AddressOption[];
+  value: string;
+  onSelect: (id: string) => void;
+  disabled?: boolean;
+  loading?: boolean;
+  loadingLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.toLowerCase().trim();
+    return options.filter((o) => o.text.toLowerCase().includes(q));
+  }, [options, search]);
+  const displayed = useMemo(() => {
+    const slice = filtered.slice(0, MAX_OPTIONS_RENDER);
+    const selectedInFull = value && options.find((o) => o.id === value);
+    if (selectedInFull && !slice.some((o) => o.id === value)) {
+      return [selectedInFull, ...slice].slice(0, MAX_OPTIONS_RENDER);
+    }
+    return slice;
+  }, [filtered, value, options]);
+  const selected = options.find((o) => o.id === value);
+  const hasMore = filtered.length > MAX_OPTIONS_RENDER;
+
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full justify-between bg-background font-normal"
+        disabled={disabled || loading}
+        onClick={() => setOpen(true)}
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            {loadingLabel}
+          </span>
+        ) : (
+          <span className="truncate">{selected?.text || placeholder}</span>
+        )}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>{label}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 bg-background"
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {displayed.length === 0 ? (
+                <p className="text-center py-4 text-muted-foreground text-sm">Tidak ada hasil</p>
+              ) : (
+                <div className="space-y-0.5">
+                  {displayed.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted transition-colors ${value === o.id ? "bg-muted font-medium" : ""}`}
+                      onClick={() => {
+                        onSelect(o.id);
+                        setOpen(false);
+                        setSearch("");
+                      }}
+                    >
+                      {o.text}
+                    </button>
+                  ))}
+                  {hasMore && (
+                    <p className="text-center py-2 text-xs text-muted-foreground">
+                      Tampilkan 100 dari {filtered.length}. Ketik untuk memfilter.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
 export function AddressSelector({ value, onChange }: AddressSelectorProps) {
   const { toast } = useToast();
@@ -524,113 +629,42 @@ export function AddressSelector({ value, onChange }: AddressSelectorProps) {
             </div>
           ) : (
             <>
-              <div className="space-y-2">
-                <Label>Provinsi</Label>
-                <Select
-                  value={selectedProvince}
-                  onValueChange={handleProvinceChange}
-                  disabled={loadingProvinces}
-                >
-                  <SelectTrigger className="bg-background">
-                    {loadingProvinces ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Memuat...</span>
-                      </div>
-                    ) : (
-                      <SelectValue placeholder="Pilih Provinsi" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {provinces.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.text}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Kabupaten/Kota</Label>
-                <Select
-                  value={selectedCity}
-                  onValueChange={handleCityChange}
-                  disabled={!selectedProvince || loadingCities}
-                >
-                  <SelectTrigger className="bg-background">
-                    {loadingCities ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Memuat...</span>
-                      </div>
-                    ) : (
-                      <SelectValue placeholder="Pilih Kabupaten/Kota" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {cities.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.text}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Kecamatan</Label>
-                <Select
-                  value={selectedDistrict}
-                  onValueChange={handleDistrictChange}
-                  disabled={!selectedCity || loadingDistricts}
-                >
-                  <SelectTrigger className="bg-background">
-                    {loadingDistricts ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Memuat...</span>
-                      </div>
-                    ) : (
-                      <SelectValue placeholder="Pilih Kecamatan" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {districts.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.text}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Kelurahan/Desa</Label>
-                <Select
-                  value={selectedSubDistrict}
-                  onValueChange={handleSubDistrictChange}
-                  disabled={!selectedDistrict || loadingSubDistricts}
-                >
-                  <SelectTrigger className="bg-background">
-                    {loadingSubDistricts ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Memuat...</span>
-                      </div>
-                    ) : (
-                      <SelectValue placeholder="Pilih Kelurahan/Desa (opsional)" />
-                    )}
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {subDistricts.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.text}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <SearchableSelect
+                label="Provinsi"
+                placeholder="Pilih Provinsi"
+                options={provinces}
+                value={selectedProvince}
+                onSelect={handleProvinceChange}
+                disabled={false}
+                loading={loadingProvinces}
+              />
+              <SearchableSelect
+                label="Kabupaten/Kota"
+                placeholder="Pilih Kabupaten/Kota"
+                options={cities}
+                value={selectedCity}
+                onSelect={handleCityChange}
+                disabled={!selectedProvince}
+                loading={loadingCities}
+              />
+              <SearchableSelect
+                label="Kecamatan"
+                placeholder="Pilih Kecamatan"
+                options={districts}
+                value={selectedDistrict}
+                onSelect={handleDistrictChange}
+                disabled={!selectedCity}
+                loading={loadingDistricts}
+              />
+              <SearchableSelect
+                label="Kelurahan/Desa (opsional)"
+                placeholder="Pilih Kelurahan/Desa"
+                options={subDistricts}
+                value={selectedSubDistrict}
+                onSelect={handleSubDistrictChange}
+                disabled={!selectedDistrict}
+                loading={loadingSubDistricts}
+              />
             </>
           )}
 
