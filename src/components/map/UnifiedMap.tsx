@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/router";
 import Image from "next/image";
 import {
   Map,
@@ -98,8 +99,16 @@ function PropertyPopupContent({
   onShowRoute: (p: PropertiMapItem) => void;
   routeLoading: boolean;
 }) {
+  const router = useRouter();
+
   return (
-    <div className="w-72 p-0">
+    <div
+      className="w-72 p-0 cursor-pointer"
+      role="button"
+      tabIndex={0}
+      onClick={() => router.push(`/properti/${p.slug}`)}
+      onKeyDown={(e) => e.key === "Enter" && router.push(`/properti/${p.slug}`)}
+    >
       <div className="relative h-36 overflow-hidden rounded-t-md bg-muted">
         <Image
           fill
@@ -113,9 +122,7 @@ function PropertyPopupContent({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {typeLabels[p.type] ?? p.type} • {p.listingType === "rent" ? "Sewa" : "Jual"}
           </span>
-          <h3 className="font-semibold text-foreground leading-tight">
-            <a href={`/properti/${p.slug}`} className="hover:underline">{p.name}</a>
-          </h3>
+          <h3 className="font-semibold text-foreground leading-tight">{p.name}</h3>
           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
             <MapPin className="size-3 shrink-0" />
             {p.district}, {p.city}
@@ -125,13 +132,16 @@ function PropertyPopupContent({
           {formatPrice(p.price, p.priceUnit, p.listingType, p.rentPeriod)}
         </p>
         <p className="text-sm text-muted-foreground line-clamp-2">{p.description}</p>
-        <div className="flex flex-col gap-2 pt-1">
+        <div className="flex flex-col gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
           <div className="flex gap-2">
             <Button
               size="sm"
               className="flex-1 h-8"
               variant="default"
-              onClick={() => onShowRoute(p)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onShowRoute(p);
+              }}
               disabled={routeLoading}
             >
               {routeLoading ? (
@@ -141,7 +151,13 @@ function PropertyPopupContent({
               )}
               Rute Jarak
             </Button>
-            <Button size="sm" variant="outline" className="h-8" asChild>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              onClick={(e) => e.stopPropagation()}
+              asChild
+            >
               <a
                 href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}
                 target="_blank"

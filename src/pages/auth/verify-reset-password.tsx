@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
+import { newPasswordSchema, getFirstZodError } from "@/lib/schemas";
 
 export default function VerifyResetPassword() {
   const router = useRouter();
@@ -52,37 +53,14 @@ export default function VerifyResetPassword() {
       return;
     }
 
-    if (!newPassword || !confirmPassword) {
+    const parsed = newPasswordSchema.safeParse({
+      newPassword,
+      confirmPassword,
+    });
+    if (!parsed.success) {
       toast({
-        title: "❌ Password Diperlukan",
-        description: "Silakan masukkan password baru dan konfirmasi password",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "❌ Password Tidak Cocok",
-        description: "Password baru dan konfirmasi password tidak sama",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      toast({
-        title: "❌ Password Terlalu Pendek",
-        description: "Password minimal 8 karakter",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length > 128) {
-      toast({
-        title: "❌ Password Terlalu Panjang",
-        description: "Password maksimal 128 karakter",
+        title: "❌ Data Tidak Valid",
+        description: getFirstZodError(parsed.error),
         variant: "destructive",
       });
       return;

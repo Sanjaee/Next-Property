@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, MapPin, Upload, X } from "lucide-react";
+import { propertiFormSchema, getFirstZodError } from "@/lib/schemas";
 
 const TIPE_PROPERTI = [
   { value: "house", label: "Rumah" },
@@ -58,13 +59,15 @@ const initialForm = {
   longitude: "",
 };
 
+const MAX_IMAGES = 10;
+const MAX_SIZE_MB = 3;
+
 export function PropertiEditForm({ editId }: { editId: string }) {
   const router = useRouter();
   const { toast } = useToast();
   const [form, setForm] = useState(initialForm);
-  const [imageFile, setImageFile] = useState<string | null>(null);
-  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
-  const [imageRemoved, setImageRemoved] = useState(false);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]);
+  const [newImageFiles, setNewImageFiles] = useState<string[]>([]);
   const [locationLoading, setLocationLoading] = useState(false);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
@@ -96,10 +99,8 @@ export function PropertiEditForm({ editId }: { editId: string }) {
           latitude: String(data.latitude ?? ""),
           longitude: String(data.longitude ?? ""),
         });
-        if (data.imageUrl) {
-          setExistingImageUrl(data.imageUrl);
-          setImageRemoved(false);
-        }
+        const urls = data.imageUrls ?? (data.imageUrl ? [data.imageUrl] : []);
+        setExistingImageUrls(Array.isArray(urls) ? urls : []);
       })
       .catch((err) => {
         toast({
@@ -112,32 +113,62 @@ export function PropertiEditForm({ editId }: { editId: string }) {
       .finally(() => setDataLoading(false));
   }, [editId, router, toast]);
 
+  const totalImages = existingImageUrls.length + newImageFiles.length;
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast({
-        title: "Format tidak valid",
-        description: "Hanya file gambar (JPG, PNG, WEBP) yang didukung.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (file.size > 4 * 1024 * 1024) {
-      toast({
-        title: "Ukuran terlalu besar",
-        description: "Maksimal 4MB per gambar.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     e.target.value = "";
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageFile(reader.result as string);
-      setExistingImageUrl(null);
-    };
-    reader.readAsDataURL(file);
+
+    const remaining = MAX_IMAGES - totalImages;
+    if (files.length > remaining) {
+      toast({
+        title: "Batas gambar tercapai",
+        description: `Maksimal ${MAX_IMAGES} gambar. Anda dapat menambah ${remaining} gambar lagi.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validFiles: File[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Format tidak valid",
+          description: `${file.name}: Hanya JPG, PNG, WEBP yang didukung.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+        toast({
+          title: "Ukuran terlalu besar",
+          description: `${file.name}: Maksimal ${MAX_SIZE_MB}MB per gambar.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    validFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setNewImageFiles((prev) => {
+          const next = [...prev, reader.result as string];
+          return next.slice(0, MAX_IMAGES - existingImageUrls.length);
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImageUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeNewImage = (index: number) => {
+    setNewImageFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleGetLocation = () => {
@@ -163,59 +194,38 @@ export function PropertiEditForm({ editId }: { editId: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !form.name ||
-      !form.description ||
-      !form.price ||
-      !form.address ||
-      !form.province ||
-      !form.city ||
-      !form.district ||
-      !form.latitude ||
-      !form.longitude
-    ) {
-      toast({ title: "Data belum lengkap", variant: "destructive" });
+
+    const parsed = propertiFormSchema.safeParse({
+      ...form,
+      rentPeriod: form.listingType === "rent" ? form.rentPeriod : null,
+    });
+    if (!parsed.success) {
+      toast({
+        title: "Data tidak valid",
+        description: getFirstZodError(parsed.error),
+        variant: "destructive",
+      });
       return;
     }
 
     const lat = parseFloat(form.latitude);
     const lng = parseFloat(form.longitude);
-    if (Number.isNaN(lat) || lat < -90 || lat > 90) {
-      toast({
-        title: "Latitude tidak valid",
-        description: "Gunakan angka -90 sampai 90 (contoh: -6.2088)",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (Number.isNaN(lng) || lng < -180 || lng > 180) {
-      toast({
-        title: "Longitude tidak valid",
-        description: "Gunakan angka -180 sampai 180 (contoh: 106.8456)",
-        variant: "destructive",
-      });
-      return;
-    }
 
     setSubmitLoading(true);
     try {
-      let imageUrl: string | undefined;
-      let removeImage = false;
-
-      if (imageFile) {
+      const uploadedUrls: string[] = [];
+      for (const img of newImageFiles) {
         const uploadRes = await fetch("/api/upload/cloudinary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: imageFile }),
+          body: JSON.stringify({ image: img }),
         });
         const uploadData = await uploadRes.json();
         if (!uploadRes.ok) throw new Error(uploadData.error || "Gagal mengunggah gambar");
-        imageUrl = uploadData.url;
-      } else if (existingImageUrl && !imageRemoved) {
-        imageUrl = existingImageUrl;
-      } else if (imageRemoved) {
-        removeImage = true;
+        uploadedUrls.push(uploadData.url);
       }
+
+      const imageUrls = [...existingImageUrls, ...uploadedUrls];
 
       const res = await fetch(`/api/properti/${editId}`, {
         method: "PATCH",
@@ -226,8 +236,7 @@ export function PropertiEditForm({ editId }: { editId: string }) {
           latitude: lat,
           longitude: lng,
           rentPeriod: form.listingType === "rent" ? form.rentPeriod : null,
-          imageUrl,
-          removeImage,
+          imageUrls,
         }),
       });
 
@@ -248,8 +257,6 @@ export function PropertiEditForm({ editId }: { editId: string }) {
       setSubmitLoading(false);
     }
   };
-
-  const currentImage = !imageRemoved ? (imageFile || existingImageUrl) : null;
 
   if (dataLoading) {
     return (
@@ -414,25 +421,57 @@ export function PropertiEditForm({ editId }: { editId: string }) {
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="text-lg">Gambar (Opsional)</CardTitle>
-          <p className="text-sm text-muted-foreground">Unggah foto utama properti. Maks. 4MB.</p>
+          <p className="text-sm text-muted-foreground">
+            Unggah foto properti. Maks. 10 gambar, {MAX_SIZE_MB}MB per gambar.
+            Format: JPG, PNG, WEBP.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
-          {currentImage ? (
-            <div className="relative inline-block">
-              <div className="relative w-48 h-32 rounded-lg overflow-hidden border border-border">
-                <img src={currentImage} alt="Preview" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {existingImageUrls.map((src, i) => (
+              <div key={`ex-${i}`} className="relative aspect-video rounded-lg overflow-hidden border border-border group">
+                <img src={src} alt={`Gambar ${i + 1}`} className="w-full h-full object-cover" />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-1 right-1 size-7 rounded-full opacity-90 group-hover:opacity-100"
+                  onClick={() => removeExistingImage(i)}
+                >
+                  <X className="size-3.5" />
+                </Button>
               </div>
-              <Button type="button" variant="destructive" size="icon" className="absolute -top-2 -right-2 size-7 rounded-full" onClick={() => { setImageFile(null); setExistingImageUrl(null); setImageRemoved(true); }}>
-                <X className="size-3.5" />
-              </Button>
-            </div>
-          ) : (
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleImageSelect} className="hidden" />
-              <Upload className="size-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Klik untuk memilih gambar</span>
-            </label>
-          )}
+            ))}
+            {newImageFiles.map((src, i) => (
+              <div key={`new-${i}`} className="relative aspect-video rounded-lg overflow-hidden border border-border group">
+                <img src={src} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  className="absolute top-1 right-1 size-7 rounded-full opacity-90 group-hover:opacity-100"
+                  onClick={() => removeNewImage(i)}
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </div>
+            ))}
+            {totalImages < MAX_IMAGES && (
+              <label className="flex flex-col items-center justify-center aspect-video border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                <Upload className="size-8 text-muted-foreground mb-1" />
+                <span className="text-xs text-muted-foreground text-center px-2">
+                  Tambah ({totalImages}/{MAX_IMAGES})
+                </span>
+              </label>
+            )}
+          </div>
         </CardContent>
       </Card>
 

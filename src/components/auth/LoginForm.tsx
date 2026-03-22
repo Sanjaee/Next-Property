@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
+import { loginSchema, getFirstZodError } from "@/lib/schemas";
 
 interface LoginFormData {
   email: string;
@@ -41,38 +42,18 @@ export const LoginForm = () => {
     }));
   };
 
-  const validateForm = (): boolean => {
-    if (!formData.email.trim()) {
-      toast({
-        title: "Error",
-        description: "Email is required",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!formData.email.includes("@")) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!formData.password) {
-      toast({
-        title: "Error",
-        description: "Password is required",
-        variant: "destructive",
-      });
-      return false;
-    }
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    const parsed = loginSchema.safeParse(formData);
+    if (!parsed.success) {
+      toast({
+        title: "Error",
+        description: getFirstZodError(parsed.error),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
 

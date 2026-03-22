@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
 import { Mail, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
+import { resetPasswordRequestSchema, newPasswordSchema, getFirstZodError } from "@/lib/schemas";
 
 export default function ResetPassword() {
   const router = useRouter();
@@ -48,10 +49,11 @@ export default function ResetPassword() {
 
   const handleRequestReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
+    const parsed = resetPasswordRequestSchema.safeParse({ email });
+    if (!parsed.success) {
       toast({
-        title: "❌ Email Diperlukan",
-        description: "Silakan masukkan email Anda",
+        title: "❌ Data Tidak Valid",
+        description: getFirstZodError(parsed.error),
         variant: "destructive",
       });
       return;
@@ -89,29 +91,13 @@ export default function ResetPassword() {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newPassword || !confirmPassword) {
-      toast({
-        title: "❌ Password Diperlukan",
-        description: "Silakan masukkan password baru dan konfirmasi password",
-        variant: "destructive",
-      });
-      return;
-    }
 
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "❌ Password Tidak Cocok",
-        description: "Password baru dan konfirmasi password tidak sama",
-        variant: "destructive",
-      });
-      return;
-    }
+    const parsed = newPasswordSchema.safeParse({ newPassword, confirmPassword });
 
-    if (newPassword.length < 8) {
+    if (!parsed.success) {
       toast({
-        title: "❌ Password Terlalu Pendek",
-        description: "Password minimal 8 karakter",
+        title: "❌ Data Tidak Valid",
+        description: getFirstZodError(parsed.error),
         variant: "destructive",
       });
       return;

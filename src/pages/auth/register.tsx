@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "@/hooks/use-toast";
 import { Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
+import { registerSchema, getFirstZodError } from "@/lib/schemas";
 
 interface RegisterFormData {
   username: string;
@@ -48,78 +49,18 @@ export default function Register() {
     }));
   };
 
-  const validateForm = (): boolean => {
-    if (!formData.username.trim()) {
-      toast({
-        title: "Error",
-        description: "Username is required",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (formData.username.length < 3) {
-      toast({
-        title: "Error",
-        description: "Username must be at least 3 characters long",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (formData.username.length > 50) {
-      toast({
-        title: "Error",
-        description: "Username must be maximum 50 characters long",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!formData.email.trim()) {
-      toast({
-        title: "Error",
-        description: "Email is required",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!formData.email.includes("@")) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!formData.password) {
-      toast({
-        title: "Error",
-        description: "Password is required",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (formData.password.length < 8) {
-      toast({
-        title: "Error",
-        description: "Password must be at least 8 characters long",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Error",
-        description: "Passwords do not match",
-        variant: "destructive",
-      });
-      return false;
-    }
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) return;
+    const parsed = registerSchema.safeParse(formData);
+    if (!parsed.success) {
+      toast({
+        title: "Error",
+        description: getFirstZodError(parsed.error),
+        variant: "destructive",
+      });
+      return;
+    }
 
     setLoading(true);
 

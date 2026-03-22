@@ -135,11 +135,17 @@ export default async function handler(
         })
         .returning();
 
-      if (body.imageUrl) {
+      const imageUrls = Array.isArray(body.imageUrls)
+        ? body.imageUrls.filter((u: unknown) => typeof u === "string")
+        : body.imageUrl
+          ? [body.imageUrl]
+          : [];
+      for (let i = 0; i < imageUrls.length; i++) {
         await db.insert(properti_images).values({
           propertiId: inserted.id,
-          imageUrl: body.imageUrl,
-          imageType: "thumbnail",
+          imageUrl: imageUrls[i],
+          imageType: i === 0 ? "thumbnail" : "gallery",
+          sortOrder: i,
         });
       }
 

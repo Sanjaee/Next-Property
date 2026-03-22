@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Mail, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { verifyOtpSchema, getFirstZodError } from "@/lib/schemas";
 
 export default function VerifyOtp() {
   const router = useRouter();
@@ -296,10 +297,11 @@ export default function VerifyOtp() {
     e.preventDefault();
 
     const otpString = otp.join("");
-    if (otpString.length !== 6) {
+    const parsed = verifyOtpSchema.safeParse({ otp: otpString });
+    if (!parsed.success) {
       toast({
-        title: "❌ OTP Tidak Valid",
-        description: "Silakan masukkan 6 digit kode OTP yang valid",
+        title: "❌ Data Tidak Valid",
+        description: getFirstZodError(parsed.error),
         variant: "destructive",
       });
       return;
