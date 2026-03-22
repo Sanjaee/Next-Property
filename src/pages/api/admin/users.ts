@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth";
-import { db, users } from "@/db";
-import { desc, sql } from "drizzle-orm";
+import { db, users, pool } from "@/db";
+import { desc, eq, sql } from "drizzle-orm";
 import { authOptions } from "../auth/[...nextauth]";
 
 export default async function handler(
@@ -38,7 +38,7 @@ export default async function handler(
       .from(users)
       .orderBy(desc(users.createdAt));
 
-    // Stats by role for chart
+    // Stats by role
     const roleStats = await db
       .select({
         userType: users.userType,
@@ -46,6 +46,52 @@ export default async function handler(
       })
       .from(users)
       .groupBy(users.userType);
+
+    // Stats by verification
+    const verifiedCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.isVerified, true));
+    const unverifiedCount = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.isVerified, false));
+
+    const roleMap = Object.fromEntries(
+      roleStats.map((s) => [s.userType, Number(s.count)])
+    );
+
+    // Registrations by date (last 90 days) for area chart
+    const regResult = await pool.query<{
+      date: string;
+      user_type: string;
+      count: string;
+    }>(`
+      SELECT date_trunc('day', created_at)::date as date, user_type, count(*)::int as count
+      FROM users
+      WHERE created_at >= now() - interval '90 days'
+      GROUP BY date_trunc('day', created_at), user_type
+      ORDER BY date
+    `);
+
+    const dateMap = new Map<string, { admin: number; member: number; premium: number }>();
+    for (const r of regResult.rows) {
+      const key = r.date;
+      if (!dateMap.has(key)) {
+        dateMap.set(key, { admin: 0, member: 0, premium: 0 });
+      }
+      const row = dateMap.get(key)!;
+      const k = r.user_type as keyof typeof row;
+      if (k in row) row[k] = Number(r.count);
+    }
+    const registrationsByDate = Array.from(dateMap.entries())
+      .map(([date, counts]) => ({
+        date,
+        admin: counts.admin,
+        member: counts.member,
+        premium: counts.premium,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     return res.status(200).json({
       users: rows.map((u) => ({
@@ -60,10 +106,19 @@ export default async function handler(
         loginType: u.loginType,
         createdAt: u.createdAt,
       })),
-      stats: roleStats.map((s) => ({
-        role: s.userType,
-        count: Number(s.count),
-      })),
+      stats: {
+        total: rows.length,
+        by_type: {
+          admin: roleMap.admin ?? 0,
+          member: roleMap.member ?? 0,
+          premium: roleMap.premium ?? 0,
+        },
+        by_verification: {
+          verified: Number(verifiedCount[0]?.count ?? 0),
+          unverified: Number(unverifiedCount[0]?.count ?? 0),
+        },
+      },
+      registrationsByDate,
     });
   } catch (error) {
     console.error("GET admin users error:", error);
