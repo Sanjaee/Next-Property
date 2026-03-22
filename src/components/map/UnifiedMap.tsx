@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/map";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, MapPin, Loader2, Clock, Route, X } from "lucide-react";
-import { useMapUI } from "@/components/contex/MapUIContext";
+import { useMapUI, MAP_STYLES } from "@/components/contex/MapUIContext";
 
 export interface PropertiMapItem {
   id: string;
@@ -188,6 +188,21 @@ export function UnifiedMap() {
 
   const useClustering = properties.length >= CLUSTER_THRESHOLD;
 
+  const mapStyles = useMemo(() => {
+    const styleUrl = mapUI?.mapStyle ? MAP_STYLES[mapUI.mapStyle] : undefined;
+    return styleUrl ? { light: styleUrl, dark: styleUrl } : undefined;
+  }, [mapUI?.mapStyle]);
+
+  const is3D = mapUI?.mapStyle === "openstreetmap3d";
+
+  useEffect(() => {
+    if (is3D) {
+      setViewport((v) => ({ ...v, pitch: 60 }));
+    } else {
+      setViewport((v) => ({ ...v, pitch: 0 }));
+    }
+  }, [is3D]);
+
   const clearRoute = () => {
     setRouteToProperty(null);
     setUserLocation(null);
@@ -242,7 +257,11 @@ export function UnifiedMap() {
 
   return (
     <div className="h-full w-full relative min-h-[500px]">
-      <Map viewport={viewport} onViewportChange={setViewport}>
+      <Map
+        viewport={viewport}
+        onViewportChange={setViewport}
+        styles={mapStyles}
+      >
         {(() => {
           const sortedRoutes = routes
             .map((route, index) => ({ route, index }))

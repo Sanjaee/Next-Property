@@ -10,12 +10,17 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { useMapUI } from "@/components/contex/MapUIContext";
-import { LogOut, User, Settings, Moon, Sun, Plus, Map, Check } from "lucide-react";
+import { useMapUI, type MapStyleKey } from "@/components/contex/MapUIContext";
+import { LogOut, User, Settings, Moon, Sun, Plus, Map, Check, Globe } from "lucide-react";
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -142,18 +147,42 @@ export default function Navbar() {
                   {theme === "dark" ? "Mode Terang" : "Mode Gelap"}
                 </DropdownMenuItem>
                 {mapUI && (
-                  <DropdownMenuItem
-                    onClick={() => mapUI.setShowViewportOverlay(!mapUI.showViewportOverlay)}
-                    className="cursor-pointer justify-between"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Map className="h-4 w-4" />
-                      Viewport (lng, lat, zoom)
-                    </span>
-                    {mapUI.showViewportOverlay && (
-                      <Check className="h-4 w-4" />
-                    )}
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => mapUI.setShowViewportOverlay(!mapUI.showViewportOverlay)}
+                      className="cursor-pointer justify-between"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Map className="h-4 w-4" />
+                        Viewport (lng, lat, zoom)
+                      </span>
+                      {mapUI.showViewportOverlay && (
+                        <Check className="h-4 w-4" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger className="cursor-pointer">
+                        <Globe className="mr-2 h-4 w-4" />
+                        Gaya Peta
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuRadioGroup
+                          value={mapUI.mapStyle}
+                          onValueChange={(v) => mapUI.setMapStyle(v as MapStyleKey)}
+                        >
+                          <DropdownMenuRadioItem value="default" className="cursor-pointer">
+                            Default (Carto)
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="openstreetmap" className="cursor-pointer">
+                            OpenStreetMap
+                          </DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="openstreetmap3d" className="cursor-pointer">
+                            OpenStreetMap 3D
+                          </DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
