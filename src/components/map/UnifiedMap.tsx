@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import Image from "next/image";
 import {
@@ -18,6 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ExternalLink, MapPin, Loader2, Clock, Route, X } from "lucide-react";
 import { useMapUI, MAP_STYLES } from "@/components/contex/MapUIContext";
+import { useToast } from "@/hooks/use-toast";
 
 export interface PropertiMapItem {
   id: string;
@@ -178,6 +179,7 @@ const CLUSTER_THRESHOLD = 15;
 
 export function UnifiedMap() {
   const mapUI = useMapUI();
+  const { toast } = useToast();
   const [viewport, setViewport] = useState<MapViewport>(initialViewport);
   const [properties, setProperties] = useState<PropertiMapItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -221,10 +223,19 @@ export function UnifiedMap() {
 
   const clearRoute = () => {
     setRouteToProperty(null);
-    setUserLocation(null);
     setRoutes([]);
     setSelectedRouteIndex(0);
   };
+
+  /** Sinkron marker + viewport React (tombol lokasi & auto-lokasi awal). */
+  const handleLocateUser = useCallback((coords: { longitude: number; latitude: number }) => {
+    setUserLocation({ lng: coords.longitude, lat: coords.latitude });
+    setViewport((v) => ({
+      ...v,
+      center: [coords.longitude, coords.latitude],
+      zoom: Math.max(v.zoom, 14),
+    }));
+  }, []);
 
   const showRouteToProperty = async (property: PropertiMapItem) => {
     if (!navigator.geolocation) return;
@@ -270,6 +281,56 @@ export function UnifiedMap() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  /** Setelah peta aktif (data properti selesai), minta izin lokasi & arahkan peta ke pengguna. */
+  useEffect(() => {
+    if (loading) return;
+    if (typeof window === "undefined" || !("geolocation" in navigator)) return;
+    try {
+      if (sessionStorage.getItem("mapGeoDenied") === "1") return;
+    } catch {
+      /* private mode */
+    }
+
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          handleLocateUser({
+            longitude: pos.coords.longitude,
+            latitude: pos.coords.latitude,
+          });
+          toast({
+            title: "Lokasi diaktifkan",
+            description: "Peta mengarah ke posisi Anda.",
+          });
+        },
+        (err) => {
+          if (cancelled) return;
+          if (err.code === 1) {
+            try {
+              sessionStorage.setItem("mapGeoDenied", "1");
+            } catch {
+              /* ignore */
+            }
+            toast({
+              title: "Lokasi tidak diizinkan",
+              description:
+                "Peta memakai tampilan default. Gunakan tombol lokasi di pojok peta jika ingin mencoba lagi.",
+              variant: "destructive",
+            });
+          }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [loading, handleLocateUser, toast]);
 
   return (
     <div className="h-full w-full relative min-h-[500px]">
@@ -364,6 +425,7 @@ export function UnifiedMap() {
           showCompass
           showLocate
           showFullscreen
+          onLocate={(coords) => handleLocateUser(coords)}
         />
       </Map>
 
