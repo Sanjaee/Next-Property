@@ -30,7 +30,7 @@ export default async function handler(
     return res.status(401).json({ error: "Harap login untuk mengunggah gambar" });
   }
 
-  const { image } = req.body as { image?: string };
+  const { image, folder } = req.body as { image?: string; folder?: string };
   if (!image || typeof image !== "string") {
     return res.status(400).json({ error: "Data gambar tidak valid" });
   }
@@ -39,9 +39,14 @@ export default async function handler(
     return res.status(400).json({ error: "Format gambar tidak didukung" });
   }
 
+  const uploadFolder =
+    typeof folder === "string" && folder.length > 0 && folder.length <= 64
+      ? folder.replace(/[^a-zA-Z0-9_-]/g, "")
+      : "property";
+
   try {
     const result = await cloudinary.uploader.upload(image, {
-      folder: "property",
+      folder: uploadFolder,
       resource_type: "image",
     });
 

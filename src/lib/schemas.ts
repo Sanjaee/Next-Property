@@ -132,6 +132,103 @@ export const contactFormSchema = z.object({
 
 export type ContactFormData = z.infer<typeof contactFormSchema>;
 
+/** Form hubungi pemilik di halaman detail (hanya pesan; kontak dari data pemilik). */
+export const contactPropertyMessageSchema = z.object({
+  message: z.string().min(1, "Pesan wajib diisi").max(2000, "Pesan maksimal 2000 karakter"),
+});
+
+// ===========================================
+// User Profile
+// ===========================================
+const GENDER_VALUES = ["male", "female", "other"] as const;
+
+/** JSON `null` untuk field opsional gagal di `z.string()` — ubah ke "" dulu. */
+function normalizeProfileBody(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const o = raw as Record<string, unknown>;
+  return {
+    ...o,
+    username: o.username == null ? "" : String(o.username),
+    phone: o.phone == null ? "" : String(o.phone),
+    dateOfBirth:
+      o.dateOfBirth === null || o.dateOfBirth === undefined
+        ? ""
+        : String(o.dateOfBirth),
+    profilePhoto:
+      o.profilePhoto === null || o.profilePhoto === undefined
+        ? ""
+        : String(o.profilePhoto),
+  };
+}
+
+export const profileFormSchema = z.preprocess(
+  normalizeProfileBody,
+  z
+    .object({
+      fullName: z.string().min(1, "Nama lengkap wajib diisi").max(255, "Nama maksimal 255 karakter"),
+      username: z.string().max(50, "Username maksimal 50 karakter"),
+      phone: z.string().max(20, "Nomor maksimal 20 karakter"),
+      gender: z.enum(GENDER_VALUES).optional().nullable(),
+      dateOfBirth: z.string(),
+      profilePhoto: z.string(),
+    })
+    .superRefine((data, ctx) => {
+      const u = data.username.trim();
+      if (u && u.length > 0 && u.length < 3) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Username minimal 3 karakter",
+          path: ["username"],
+        });
+      }
+      if (u && !/^[a-zA-Z0-9_]+$/.test(u)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Username hanya huruf, angka, dan underscore",
+          path: ["username"],
+        });
+      }
+      const dob = data.dateOfBirth.trim();
+      if (dob) {
+        const d = new Date(dob + "T12:00:00");
+        if (Number.isNaN(d.getTime())) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Tanggal lahir tidak valid",
+            path: ["dateOfBirth"],
+          });
+        }
+      }
+      const photo = data.profilePhoto.trim();
+      if (photo.length > 0) {
+        try {
+          // eslint-disable-next-line no-new
+          new URL(photo);
+        } catch {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "URL foto tidak valid",
+            path: ["profilePhoto"],
+          });
+        }
+      }
+    })
+);
+
+export type ProfileFormData = z.infer<typeof profileFormSchema>;
+
+/** Payload API setelah normalisasi string kosong → undefined */
+export function normalizeProfilePayload(data: ProfileFormData) {
+  return {
+    fullName: data.fullName.trim(),
+    username: data.username.trim() || undefined,
+    phone: data.phone.trim() || undefined,
+    gender: data.gender ?? null,
+    dateOfBirth: data.dateOfBirth.trim() || null,
+    profilePhoto: data.profilePhoto.trim() || null,
+  };
+}
+
 // ===========================================
 // Helper
 // ===========================================

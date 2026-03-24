@@ -7,6 +7,7 @@ import { ApiProvider } from "@/components/contex/ApiProvider";
 import { MapUIProvider } from "@/components/contex/MapUIContext";
 import { Geist, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { RouteLoadingProvider } from "@/components/general/RouteLoadingProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,8 +29,10 @@ export default function App({
         <SessionProvider session={session}>
           <ApiProvider>
             <MapUIProvider>
-              <Component {...pageProps} />
-              <Toaster />
+              <RouteLoadingProvider>
+                <Component {...pageProps} />
+                <Toaster />
+              </RouteLoadingProvider>
             </MapUIProvider>
           </ApiProvider>
         </SessionProvider>

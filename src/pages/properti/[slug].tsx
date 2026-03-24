@@ -9,7 +9,6 @@ import { eq, asc } from "drizzle-orm";
 import Navbar from "@/components/general/Navbar";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -30,13 +29,20 @@ import {
   ParkingCircle,
   ChevronLeft,
   ChevronRight,
+  Mail,
+  Phone,
+  MessageCircle,
 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { contactFormSchema, getFirstZodError, scrollToInvalidField } from "@/lib/schemas";
+import {
+  contactPropertyMessageSchema,
+  getFirstZodError,
+  scrollToInvalidField,
+} from "@/lib/schemas";
 
 const PropertyLocationMap = dynamic(
   () =>
@@ -101,43 +107,70 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
   const router = useRouter();
   const [showFullDesc, setShowFullDesc] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
-  const [contactName, setContactName] = React.useState("");
-  const [contactEmail, setContactEmail] = React.useState("");
-  const [contactPhone, setContactPhone] = React.useState("");
   const [contactMessage, setContactMessage] = React.useState("");
-  const [contactSubmitting, setContactSubmitting] = React.useState(false);
   const [slideIndex, setSlideIndex] = React.useState(0);
   const [imageDialogOpen, setImageDialogOpen] = React.useState(false);
 
-  const handleContactSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = contactFormSchema.safeParse({
-      name: contactName,
-      email: contactEmail,
-      phone: contactPhone,
-      message: contactMessage,
-    });
+  const buildContactBody = (message: string, propertyName: string, url: string) => {
+    const t = message.trim();
+    const footer = `\n\n---\nProperti: ${propertyName}\n${url}`;
+    return t ? `${t}${footer}` : footer.trim();
+  };
+
+  /** Nomor untuk wa.me (62…) dari nilai di DB */
+  const toWhatsAppDigits = (raw: string | null | undefined): string | null => {
+    if (!raw) return null;
+    const digits = raw.replace(/\D/g, "");
+    if (!digits) return null;
+    if (digits.startsWith("62")) return digits;
+    if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+    if (digits.length >= 9) return `62${digits}`;
+    return null;
+  };
+
+  const openOwnerEmail = (ownerEmail: string, propertyName: string, url: string) => {
+    const parsed = contactPropertyMessageSchema.safeParse({ message: contactMessage });
     if (!parsed.success) {
       scrollToInvalidField(parsed.error);
       toast({
-        title: "❌ Data Tidak Valid",
+        title: "Data tidak valid",
         description: getFirstZodError(parsed.error),
         variant: "destructive",
       });
       return;
     }
-    setContactSubmitting(true);
-    try {
-      // TODO: Integrate dengan API kirim pesan
-      toast({ title: "✅ Pesan terkirim!", description: "Pemilik akan menghubungi Anda." });
-      setContactName("");
-      setContactEmail("");
-      setContactPhone("");
-      setContactMessage("");
-    } catch {
-      toast({ title: "❌ Gagal mengirim", description: "Silakan coba lagi.", variant: "destructive" });
-    } finally {
-      setContactSubmitting(false);
+    const body = buildContactBody(parsed.data.message, propertyName, url);
+    const subject = encodeURIComponent(`Minat properti: ${propertyName}`);
+    const mailto = `mailto:${ownerEmail}?subject=${subject}&body=${encodeURIComponent(body)}`;
+    if (typeof window !== "undefined") {
+      window.location.href = mailto;
+    }
+  };
+
+  const openOwnerWhatsApp = (phoneRaw: string | null | undefined, propertyName: string, url: string) => {
+    const parsed = contactPropertyMessageSchema.safeParse({ message: contactMessage });
+    if (!parsed.success) {
+      scrollToInvalidField(parsed.error);
+      toast({
+        title: "Data tidak valid",
+        description: getFirstZodError(parsed.error),
+        variant: "destructive",
+      });
+      return;
+    }
+    const wa = toWhatsAppDigits(phoneRaw);
+    if (!wa) {
+      toast({
+        title: "WhatsApp tidak tersedia",
+        description: "Pemilik belum mencantumkan nomor telepon.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const body = buildContactBody(parsed.data.message, propertyName, url);
+    const href = `https://wa.me/${wa}?text=${encodeURIComponent(body)}`;
+    if (typeof window !== "undefined") {
+      window.open(href, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -549,65 +582,78 @@ export default function PropertiDetailPage({ data }: { data: PageData | null }) 
               <div className="sticky top-40">
                 <div className="border rounded-xl p-6 bg-card shadow-sm space-y-4">
                   <h3 className="font-semibold text-lg">Hubungi Pemilik</h3>
-                  <form onSubmit={handleContactSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Nama Lengkap</Label>
-                      <Input
-                        id="name"
-                        data-field="name"
-                        placeholder="Masukkan nama lengkap"
-                        className="bg-background"
-                        value={contactName}
-                        onChange={(e) => setContactName(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        data-field="email"
-                        type="email"
-                        placeholder="email@contoh.com"
-                        className="bg-background"
-                        value={contactEmail}
-                        onChange={(e) => setContactEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="contact-phone">Nomor Telepon</Label>
-                      <Input
-                        id="phone"
-                        data-field="phone"
-                        placeholder="08xxxxxxxxxx"
-                        className="bg-background"
-                        value={contactPhone}
-                        onChange={(e) => setContactPhone(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="message">Pesan</Label>
-                      <Textarea
-                        id="message"
-                        data-field="message"
-                        placeholder="Tulis pesan Anda..."
-                        rows={4}
-                        className="bg-background resize-none"
-                        value={contactMessage}
-                        onChange={(e) => setContactMessage(e.target.value)}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Dengan mengirim form, Anda setuju dengan syarat dan ketentuan serta
-                      kebijakan privasi kami.
-                    </p>
-                    <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={contactSubmitting}>
-                      {contactSubmitting ? "Mengirim..." : "Kirim"}
-                    </Button>
-                  </form>
-                  {owner && (
-                    <p className="text-xs text-muted-foreground pt-2 border-t">
-                      Diposting oleh {owner.fullName}
-                    </p>
+                  {owner ? (
+                    <>
+                      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                        <div className="flex gap-2 min-w-0">
+                          <Mail className="size-4 shrink-0 text-muted-foreground mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">Email</p>
+                            <a
+                              href={`mailto:${owner.email}`}
+                              className="font-medium text-foreground break-all hover:underline"
+                            >
+                              {owner.email}
+                            </a>
+                          </div>
+                        </div>
+                        <div className="flex gap-2 min-w-0">
+                          <Phone className="size-4 shrink-0 text-muted-foreground mt-0.5" />
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">WhatsApp / Telepon</p>
+                            {owner.phone ? (
+                              <span className="font-medium text-foreground break-all">{owner.phone}</span>
+                            ) : (
+                              <span className="text-muted-foreground">Belum diisi pemilik</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="message">Pesan</Label>
+                        <Textarea
+                          id="message"
+                          data-field="message"
+                          placeholder="Tulis pesan singkat (wajib). Akan disertakan ke email atau WhatsApp."
+                          rows={4}
+                          className="bg-background resize-none border-border"
+                          value={contactMessage}
+                          onChange={(e) => setContactMessage(e.target.value)}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Tombol di bawah membuka aplikasi email atau WhatsApp dengan pesan Anda dan tautan properti ini.
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          type="button"
+                          className="w-full gap-2 bg-orange-500 hover:bg-orange-600"
+                          onClick={() =>
+                            openOwnerEmail(owner.email, p.name, typeof window !== "undefined" ? window.location.href : "")
+                          }
+                        >
+                          <Mail className="size-4" />
+                          Buka email
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full gap-2 border-green-600 text-green-700 hover:bg-green-50 dark:hover:bg-green-950/30"
+                          disabled={!owner.phone}
+                          onClick={() =>
+                            openOwnerWhatsApp(owner.phone, p.name, typeof window !== "undefined" ? window.location.href : "")
+                          }
+                        >
+                          <MessageCircle className="size-4" />
+                          Buka WhatsApp
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                        Diposting oleh {owner.fullName}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Data pemilik tidak tersedia.</p>
                   )}
                 </div>
               </div>
@@ -661,7 +707,7 @@ type PageData = {
     waterSource: string | null;
   } | null;
   images: { imageUrl: string; imageType: string }[];
-  owner: { fullName: string; email: string } | null;
+  owner: { fullName: string; email: string; phone: string | null } | null;
 };
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
@@ -689,7 +735,11 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     .orderBy(asc(properti_images.sortOrder));
 
   const [ownerRow] = await db
-    .select({ fullName: users.fullName, email: users.email })
+    .select({
+      fullName: users.fullName,
+      email: users.email,
+      phone: users.phone,
+    })
     .from(users)
     .where(eq(users.id, row.ownerId))
     .limit(1);
@@ -746,7 +796,11 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
           imageType: r.imageType,
         })),
         owner: ownerRow
-          ? { fullName: ownerRow.fullName, email: ownerRow.email }
+          ? {
+              fullName: ownerRow.fullName,
+              email: ownerRow.email,
+              phone: ownerRow.phone ?? null,
+            }
           : null,
       },
     },

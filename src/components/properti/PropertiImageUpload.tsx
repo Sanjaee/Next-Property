@@ -112,15 +112,15 @@ export function PropertiImageUpload({
 
   return (
     <Card className="border-border bg-card">
-      <CardHeader>
-        <CardTitle className="text-lg">Gambar (Opsional)</CardTitle>
-        <p className="text-sm text-muted-foreground">
+      <CardHeader className="px-4 py-5 sm:px-6 sm:py-6">
+        <CardTitle className="text-lg sm:text-xl">Gambar (Opsional)</CardTitle>
+        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
           Unggah foto properti. Maks. {MAX_IMAGES} gambar, {MAX_SIZE_MB}MB per gambar.
           Format: JPG, PNG, WEBP. Gambar pertama = thumbnail (muncul di peta).
         </p>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      <CardContent className="space-y-4 px-4 pb-6 sm:px-6 sm:pb-8">
+        <div className="grid grid-cols-2 gap-4 sm:gap-5 md:gap-6">
           {images.map((item, i) => (
             <ImageItem
               key={`img-${i}-${item.src.slice(0, 30)}`}
@@ -133,7 +133,7 @@ export function PropertiImageUpload({
             />
           ))}
           {totalImages < MAX_IMAGES && (
-            <label className="flex flex-col items-center justify-center aspect-video border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+            <label className="flex min-h-44 sm:min-h-52 md:min-h-60 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border bg-muted/30 px-3 py-6 cursor-pointer transition-colors hover:bg-muted/50 active:bg-muted/60">
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -141,9 +141,12 @@ export function PropertiImageUpload({
                 onChange={handleImageSelect}
                 className="hidden"
               />
-              <Upload className="size-8 text-muted-foreground mb-1" />
-              <span className="text-xs text-muted-foreground text-center px-2">
-                Tambah ({totalImages}/{MAX_IMAGES})
+              <Upload className="size-10 sm:size-12 text-muted-foreground" />
+              <span className="text-sm sm:text-base font-medium text-foreground text-center">
+                Tambah gambar
+              </span>
+              <span className="text-xs sm:text-sm text-muted-foreground text-center">
+                {totalImages}/{MAX_IMAGES}
               </span>
             </label>
           )}
@@ -217,10 +220,10 @@ function ImageItem({
   onClick: () => void;
 }) {
   return (
-    <div className="relative aspect-video rounded-lg overflow-hidden border border-border group">
+    <div className="relative min-h-44 sm:min-h-52 md:min-h-60 w-full overflow-hidden rounded-xl border-2 border-border bg-muted/20 shadow-sm group">
       <button
         type="button"
-        className="absolute inset-0 w-full h-full cursor-zoom-in focus:outline-none"
+        className="absolute inset-0 z-0 flex h-full min-h-44 sm:min-h-52 md:min-h-60 w-full cursor-zoom-in items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         onClick={onClick}
         aria-label="Lihat gambar lebih besar"
       >
@@ -228,12 +231,12 @@ function ImageItem({
         <img
           src={src}
           alt={`Gambar ${index + 1}`}
-          className="w-full h-full object-cover"
+          className="h-full w-full min-h-44 sm:min-h-52 md:min-h-60 object-cover"
         />
       </button>
       {isThumbnail && (
-        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-primary text-primary-foreground text-xs font-medium flex items-center gap-0.5">
-          <Star className="size-3 fill-current" />
+        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-primary-foreground text-xs font-medium shadow sm:text-sm">
+          <Star className="size-3.5 shrink-0 fill-current sm:size-4" />
           Thumbnail
         </div>
       )}
@@ -242,27 +245,28 @@ function ImageItem({
           type="button"
           variant="secondary"
           size="sm"
-          className="absolute top-1 left-1 h-6 px-1.5 text-xs opacity-90 group-hover:opacity-100"
+          className="absolute top-2 left-2 z-10 h-auto min-h-9 max-w-[calc(100%-3.5rem)] px-2 py-1.5 text-[10px] leading-tight opacity-95 shadow sm:max-w-[85%] sm:text-xs"
           onClick={(e) => {
             e.stopPropagation();
             onSetThumbnail();
           }}
         >
-          <Star className="size-3 mr-0.5" />
-          Jadikan thumbnail
+          <Star className="size-3 shrink-0 sm:size-3.5" />
+          <span className="line-clamp-2 text-left">Jadikan thumbnail</span>
         </Button>
       )}
       <Button
         type="button"
         variant="destructive"
         size="icon"
-        className="absolute top-1 right-1 size-7 rounded-full opacity-90 group-hover:opacity-100"
+        className="absolute top-2 right-2 z-10 size-9 rounded-full shadow sm:size-10"
         onClick={(e) => {
           e.stopPropagation();
           onRemove();
         }}
+        aria-label="Hapus gambar"
       >
-        <X className="size-3.5" />
+        <X className="size-4 sm:size-5" />
       </Button>
     </div>
   );
